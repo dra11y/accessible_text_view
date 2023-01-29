@@ -1,0 +1,22 @@
+PODS:
+  - accessible_text_view (0.0.1):
+    - Flutter
+  - Flutter (1.0.0)
+
+DEPENDENCIES:
+  - accessible_text_view (from `.symlinks/plugins/accessible_text_view/ios`)
+  - Flutter (from `Flutter`)
+
+EXTERNAL SOURCES:
+  accessible_text_view:
+    :path: ".symlinks/plugins/accessible_text_view/ios"
+  Flutter:
+    :path: Flutter
+
+SPEC CHECKSUMS:
+  accessible_text_view: 761248aac39fc138221c6b30dbc43c1b767adf4a
+  Flutter: f04841e97a9d0b0a8025694d0796dd46242b2854
+
+PODFILE CHECKSUM: ef19549a9bc3046e7bb7d2fab4d021637c0c58a3
+
+COCOAPODS: 1.11.3
