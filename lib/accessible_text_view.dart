@@ -6,31 +6,66 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+/// A callback fired when the native platform text view is created.
 typedef NativeTextViewCreatedCallback = void Function(
     NativeTextViewController controller);
 
+/// The accessibility behavior (currently iOS only) of the native text view.
 enum NativeTextViewBehavior {
+  /// Use the default accessibility behavior of the platform.
+  /// On iOS, this has limitations when more than one link is embedded in the text view.
+  /// One in particular is lack of Switch Control access to links using Apple's default behavior.
   platformDefault,
+
+  /// Augments Apple's default accessibility behavior in two ways:
+  /// 1. Adds a long-press context menu popup with all of the links (like Android);
+  /// 2. Make all links available and focusable with Switch Control on iOS.
   platformDefaultPlusLinksLongPressMenu,
+
+  /// Overrides Apple's default accessibility behavior, and makes all non-link and
+  /// link nodes separately focusable, similar to Safari. This works with both
+  /// VoiceOver and Switch Control.
   linksAsFocusNodes,
 }
 
+/// Renders a native text view platform widget.
 class NativeTextView extends StatefulWidget {
   const NativeTextView({
     super.key,
+
+    /// Only accepts very simple HTML, such as links, boldface, and paragraph
+    /// marks. More complex things such as image tags will not work.
     required this.html,
     this.textColor,
     this.linkColor,
     this.backgroundColor,
     this.fontFamily,
     this.fontSize,
+
+    /// Uses data detection (Android and iOS) to auto-detect links that aren't explicitly
+    /// added in the HTML, such as phone numbers and e-mail addresses.
+    /// This doesn't seem to be 100% reliable on iOS.
     this.autoLinkify = true,
+
+    /// If `true`, makes the text selectable, which can make the VoiceOver user experience
+    /// a bit more complicated.
     this.isSelectable = false,
     this.maxLines = 0,
+
+    /// Override dark or light mode. On iOS, this is currently the only way to prevent
+    /// the long-press menu from a very annoying color invert if your app's theme does not
+    /// follow the system theme.
     this.appearance = NativeTextViewAppearance.system,
+
+    /// See the `NativeTextViewBehavior` enum for more info.
     this.accessibilityBehaviorIOS =
         NativeTextViewBehavior.platformDefaultPlusLinksLongPressMenu,
+
+    /// Callback fired when the native platform view is created.
     this.onTextViewCreated,
+
+    /// If `true`, captures the specified gestures while allowing Flutter to
+    /// pick up other gestures such as swipes for scrolling.
     this.passTapAndLongPressGesturesToNativeView = true,
   }) : super();
 
@@ -55,6 +90,7 @@ class NativeTextView extends StatefulWidget {
   State<NativeTextView> createState() => _NativeTextViewState();
 }
 
+/// The persistent state of the native platform text view.
 class _NativeTextViewState extends State<NativeTextView> {
   NativeTextViewController? controller;
 
@@ -138,12 +174,14 @@ class _NativeTextViewState extends State<NativeTextView> {
   }
 }
 
+/// Used to override the appearance of the native platform text view on iOS.
 enum NativeTextViewAppearance {
   light,
   dark,
   system,
 }
 
+/// Set the options of the native platform text view widget.
 class NativeAccessibleTextViewOptions {
   NativeAccessibleTextViewOptions({
     this.html,
@@ -194,9 +232,11 @@ class NativeAccessibleTextViewOptions {
 }
 
 extension ColorExtension on Color {
+  /// Convert a color to JSON-encodable format for the API.
   List<int> get argb => [alpha, red, green, blue];
 }
 
+/// A controller for the native platform text view to facilitate communication with Flutter.
 class NativeTextViewController {
   NativeTextViewController._(int id)
       : _channel =
