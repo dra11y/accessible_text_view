@@ -133,7 +133,6 @@ class _NativeTextViewState extends State<NativeTextView> {
   @override
   Widget build(BuildContext context) {
     final defaultTextStyle = DefaultTextStyle.of(context).style;
-    final colorScheme = Theme.of(context).colorScheme;
     final options = NativeAccessibleTextViewOptions(
       html: widget.html,
       textColor: widget.textColor ?? defaultTextStyle.color,
