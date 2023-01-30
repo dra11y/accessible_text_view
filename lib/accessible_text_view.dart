@@ -37,7 +37,9 @@ class NativeTextView extends StatefulWidget {
     /// marks. More complex things such as image tags will not work.
     required this.html,
     this.textColor,
+    this.textWeight,
     this.linkColor,
+    this.linkWeight,
     this.backgroundColor,
     this.fontFamily,
     this.fontSize,
@@ -72,7 +74,9 @@ class NativeTextView extends StatefulWidget {
   final String html;
   // When `null`, these values take on the DefaultTextStyle of the build context.
   final Color? textColor;
+  final FontWeight? textWeight;
   final Color? linkColor;
+  final FontWeight? linkWeight;
   final Color? backgroundColor;
   final String? fontFamily;
   final double? fontSize;
@@ -106,9 +110,6 @@ class _NativeTextViewState extends State<NativeTextView> {
             Factory<LongPressGestureRecognizer>(
               () => LongPressGestureRecognizer(),
             ),
-            Factory<EagerGestureRecognizer>(
-              () => EagerGestureRecognizer(),
-            ),
           }
         : null;
 
@@ -136,7 +137,9 @@ class _NativeTextViewState extends State<NativeTextView> {
     final options = NativeAccessibleTextViewOptions(
       html: widget.html,
       textColor: widget.textColor ?? defaultTextStyle.color,
+      textWeight: widget.textWeight ?? FontWeight.normal,
       linkColor: widget.linkColor ?? defaultTextStyle.decorationColor,
+      linkWeight: widget.linkWeight ?? FontWeight.w600,
       backgroundColor: widget.backgroundColor ?? Colors.transparent,
       fontFamily: widget.fontFamily ?? defaultTextStyle.fontFamily,
       fontSize: widget.fontSize ?? defaultTextStyle.fontSize,
@@ -186,7 +189,9 @@ class NativeAccessibleTextViewOptions {
   NativeAccessibleTextViewOptions({
     this.html,
     this.textColor,
+    this.textWeight,
     this.linkColor,
+    this.linkWeight,
     this.backgroundColor,
     this.fontFamily,
     this.fontSize,
@@ -199,7 +204,9 @@ class NativeAccessibleTextViewOptions {
 
   final String? html;
   final Color? textColor;
+  final FontWeight? textWeight;
   final Color? linkColor;
+  final FontWeight? linkWeight;
   final Color? backgroundColor;
   final String? fontFamily;
   final double? fontSize;
@@ -218,7 +225,9 @@ class NativeAccessibleTextViewOptions {
     return {
       'html': html,
       'textColor': textColor?.argb,
+      'textWeight': textWeight?.value,
       'linkColor': linkColor?.argb,
+      'linkWeight': linkWeight?.value,
       'backgroundColor': backgroundColor?.argb,
       'fontFamily': fontFamily,
       'fontSize': fontSize,

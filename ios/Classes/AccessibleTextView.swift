@@ -6,6 +6,26 @@
 //
 
 import Flutter
+import UIKit
+
+extension UIFont {
+    public var weight: UIFont.Weight {
+        if
+            let traits = fontDescriptor.fontAttributes[.traits] as? [UIFontDescriptor.TraitKey: Any],
+            let weight = traits[.weight] as? CGFloat
+        {
+            return UIFont.Weight(weight)
+        }
+        return UIFont.Weight.medium
+    }
+
+    public func withWeight(weight: UIFont.Weight) -> UIFont {
+        let descriptor = fontDescriptor.addingAttributes([
+            UIFontDescriptor.AttributeName.traits: [
+                UIFontDescriptor.TraitKey.weight: weight.rawValue]])
+        return UIFont(descriptor: descriptor, size: pointSize)
+    }
+}
 
 extension CGRect {
     public var center: CGPoint { .init(x: midX, y: midY) }
@@ -39,6 +59,8 @@ public struct AccessibleTextViewOptions: Codable {
     let html: String?
     let textColor: [CGFloat]?
     let linkColor: [CGFloat]?
+    let textWeight: Int?
+    let linkWeight: Int?
     let backgroundColor: [CGFloat]?
     let fontFamily: String?
     let fontSize: CGFloat?
@@ -55,6 +77,8 @@ public struct AccessibleTextViewOptions: Codable {
         html: String? = nil,
         textColor: [CGFloat]? = nil,
         linkColor: [CGFloat]? = nil,
+        textWeight: Int? = nil,
+        linkWeight: Int? = nil,
         backgroundColor: [CGFloat]? = nil,
         fontFamily: String? = nil,
         fontSize: CGFloat? = nil,
@@ -70,6 +94,8 @@ public struct AccessibleTextViewOptions: Codable {
         self.html = html
         self.textColor = textColor
         self.linkColor = linkColor
+        self.textWeight = textWeight
+        self.linkWeight = linkWeight
         self.backgroundColor = backgroundColor
         self.fontFamily = fontFamily
         self.fontSize = fontSize
@@ -81,6 +107,22 @@ public struct AccessibleTextViewOptions: Codable {
         self.errorCode = errorCode
         self.errorMessage = errorMessage
         self.accessibilityBehavior = accessibilityBehavior
+    }
+
+    func uiTextWeight() -> CGFloat? {
+        uiFontWeight(textWeight)
+    }
+
+    func uiLinkWeight() -> CGFloat? {
+        uiFontWeight(linkWeight)
+    }
+
+    func uiFontWeight(_ weight: Int?) -> CGFloat? {
+        guard let weight = weight else { return nil }
+        let normalizedInt = CGFloat(weight - 400)
+        // Flutter normal weight = 400, min = 100, max = 900
+        // iOS min weight = -1.0, normal = 0.0, max = 1.0
+        return normalizedInt < 0 ? normalizedInt / 300.0 : normalizedInt / 500.0
     }
 
     func uiTextColor() -> UIColor? {
@@ -518,7 +560,7 @@ public class TextView: NSObject, FlutterPlatformView {
             assertionFailure("No options provided.")
             return
         }
-
+        
         let options = AccessibleTextViewOptions.from(json: json)
 
         textView.dataDetectorTypes = options.autoLinkify == true ? .all : .init()
@@ -533,20 +575,46 @@ public class TextView: NSObject, FlutterPlatformView {
 
         textView.adjustsFontForContentSizeCategory = true
 
+        let textFont: UIFont
         if let font = options.uiFont() {
-            textView.font = UIFontMetrics.default.scaledFont(for: font)
+            textFont = UIFontMetrics.default.scaledFont(for: font)
+        } else {
+            textFont = textView.font ?? UIFontMetrics.default.scaledFont(for: UIFont.systemFont(ofSize: UIFont.systemFontSize))
         }
+        
+        textView.font = textFont
 
         if let textColor = options.uiTextColor() {
             textView.textColor = textColor
         }
-
+        
+        var linkAttributes = [NSAttributedString.Key: Any]()
         if let linkColor = options.uiLinkColor() {
-            textView.linkTextAttributes = [
-                .foregroundColor: linkColor,
-                .underlineStyle: NSUnderlineStyle.single.rawValue,
-            ]
+            linkAttributes[.foregroundColor] = linkColor
         }
+        
+        let textWeight: CGFloat
+        if
+            let traits = textFont.fontDescriptor.fontAttributes[.traits] as? [UIFontDescriptor.TraitKey: Any],
+            let weight = traits[.weight] as? CGFloat
+        {
+            textWeight = weight
+            print("Got textWeight of \(weight)")
+        } else {
+            print("Taking default textWeight of 0.0")
+            textWeight = 1.0 // normal
+        }
+
+        let linkWeight = options.uiLinkWeight() ?? textWeight
+        print("IOS linkWeight = \(linkWeight)")
+
+        let descriptor = textFont.fontDescriptor.addingAttributes([
+            UIFontDescriptor.AttributeName.traits: [
+                UIFontDescriptor.TraitKey.weight: linkWeight]])
+        let linkFont = UIFont(descriptor: descriptor, size: textFont.pointSize)
+        linkAttributes[.font] = linkFont
+        linkAttributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
+        textView.linkTextAttributes = linkAttributes
 
         if
             #available(iOS 13.0, *),

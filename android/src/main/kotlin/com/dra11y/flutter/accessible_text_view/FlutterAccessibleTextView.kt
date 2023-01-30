@@ -1,16 +1,13 @@
 package com.dra11y.flutter.accessible_text_view
 
 import android.content.Context
+import android.graphics.Typeface
 import android.text.Spannable
-import android.text.SpannableString
 import android.text.method.LinkMovementMethod
-import android.text.style.URLSpan
-import android.text.util.Linkify
 import android.view.View
 import android.view.View.IMPORTANT_FOR_ACCESSIBILITY_YES
 import android.widget.TextView
 import androidx.core.text.HtmlCompat
-import androidx.core.text.HtmlCompat.FROM_HTML_MODE_COMPACT
 import androidx.core.text.HtmlCompat.FROM_HTML_MODE_LEGACY
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
@@ -29,6 +26,7 @@ class FlutterAccessibleTextView(
     private val methodChannel: MethodChannel
     private var html: String = ""
     private var autoLinkify: Boolean = true
+    private var linkFont: Typeface? = null
 
     init {
         textView = TextView(context)
@@ -61,12 +59,17 @@ class FlutterAccessibleTextView(
             autoLinkify = it
             needsUpdate = true
         }
-        options.textColor?.let {
-            println("raw color = ${it}")
-            textView.setTextColor(it.toColor())
-        }
+        options.textColor?.let { textView.setTextColor(it.toColor()) }
         options.linkColor?.let { textView.setLinkTextColor(it.toColor()) }
-        options.fontFamily?.let { textView.typeface = FontRegistry.resolve(it) }
+        val typeface = options.fontFamily?.let { FontRegistry.resolve(it) } ?: Typeface.DEFAULT
+        val textWeight = options.textWeight ?: 400
+        val linkWeight = options.linkWeight ?: 700
+        val textFont = typeface.withWeight(textWeight)
+        linkFont = typeface.withWeight(linkWeight)
+        if (textWeight != linkWeight) {
+            needsUpdate = true
+        }
+        textView.typeface = textFont
         options.fontSize?.let { textView.textSize = it }
         options.isSelectable?.let { textView.setTextIsSelectable(it) }
         options.maxLines?.let { textView.maxLines = if (it < 1) Int.MAX_VALUE else it }
@@ -76,25 +79,19 @@ class FlutterAccessibleTextView(
 
     private fun update() {
         val htmlSpannable = HtmlCompat.fromHtml(html, FROM_HTML_MODE_LEGACY) as Spannable
-        val htmlSpans = htmlSpannable.getSpans(0, htmlSpannable.length, URLSpan::class.java)
-        val combinedSpannable = SpannableString(htmlSpannable)
 
-        // Auto-linkify phone numbers and e-mails.
+        val linkTypeface = linkFont ?: Typeface.DEFAULT_BOLD
+
         if (autoLinkify) {
-            Linkify.addLinks(combinedSpannable, Linkify.ALL)
-            for (span: URLSpan in htmlSpans) {
-                combinedSpannable.setSpan(
-                    span,
-                    htmlSpannable.getSpanStart(span),
-                    htmlSpannable.getSpanEnd(span),
-                    0,
-                )
-            }
+            htmlSpannable.autoLinkify()
         }
+
+        // Format spans with bold and sort them in order for TalkBack.
+        htmlSpannable.formatSpans(linkTypeface)
 
         textView.linksClickable = true
         textView.movementMethod = LinkMovementMethod.getInstance()
-        textView.text = combinedSpannable
+        textView.text = htmlSpannable
     }
 
     override fun dispose() {}

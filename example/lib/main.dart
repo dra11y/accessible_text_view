@@ -17,7 +17,7 @@ class TextViewExample extends StatelessWidget {
               child: const Text('Flutter TextView example'),
             ),
           ),
-          backgroundColor: Colors.deepPurple,
+          backgroundColor: Colors.black38,
           body: Column(children: [
             const Expanded(
               flex: 3,
@@ -30,14 +30,12 @@ class TextViewExample extends StatelessWidget {
     On iOS, VoiceOver should navigate each non-link and link chunk separately.
     
     <p>This component really should not be used for long text, because it is not designed for long text. For that, use a web view.</p>
-    
-    <p>Vivamus aliquet enim ultricies dui gravida, quis <a href="https://www.lipsum.com">bibendum lorem varius</a>. Suspendisse lobortis, nibh non dictum convallis, nibh purus auctor enim, at lacinia metus urna eu sem. Vivamus consequat quam ac ante commodo, id egestas massa sodales. Phasellus suscipit cursus nibh, nec ultricies ligula sollicitudin ac. Maecenas ullamcorper, lectus non suscipit sodales, arcu velit semper est, sagittis volutpat leo odio ut elit. Sed aliquam eros tincidunt euismod vehicula. Integer quis purus eget ante venenatis sagittis a non lacus. Proin viverra nibh diam, id fringilla ante facilisis sit amet.</p>
-    </p>
                     """,
                 // textColor: Theme.of(context).colorScheme.onSurface,
-                textColor: Colors.red,
-                linkColor: Colors.purple,
-                fontFamily: 'Arial',
+                textColor: Colors.white,
+                linkWeight: FontWeight.bold,
+                linkColor: Colors.blueAccent,
+                appearance: NativeTextViewAppearance.dark,
                 fontSize: 14,
               ),
             ),
