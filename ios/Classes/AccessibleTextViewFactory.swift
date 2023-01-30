@@ -8,7 +8,6 @@
 import Flutter
 
 public class AccessibleTextViewFactory: NSObject, FlutterPlatformViewFactory {
-
     public init(messenger: FlutterBinaryMessenger) {
         self.messenger = messenger
     }

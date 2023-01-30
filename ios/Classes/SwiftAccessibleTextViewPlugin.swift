@@ -3,7 +3,6 @@ import UIKit
 
 public class SwiftAccessibleTextViewPlugin: NSObject, FlutterPlugin {
     public static func register(with registrar: FlutterPluginRegistrar) {
-
         FontRegistry.registerFonts(registrar: registrar)
 
         let factory = AccessibleTextViewFactory(messenger: registrar.messenger())
@@ -20,7 +19,7 @@ struct FontManifestEntry: Decodable {
     }
 }
 
-public class FontRegistry {
+public enum FontRegistry {
     public static func resolve(family: String?, size: CGFloat?) -> UIFont? {
         let size = size ?? UIFont.systemFontSize
         guard
@@ -36,7 +35,7 @@ public class FontRegistry {
         registeredFonts[family] = fontName
     }
 
-    private static var registeredFonts = [String : String]()
+    private static var registeredFonts = [String: String]()
 
     fileprivate static func registerFonts(registrar: FlutterPluginRegistrar) {
         guard
@@ -53,7 +52,7 @@ public class FontRegistry {
                 let assetKey = registrar.lookupKey(forAsset: fontAsset.asset)
                 let fontName = NSString(string: NSString(string: fontAsset.asset).lastPathComponent).deletingPathExtension
 
-                var error: Unmanaged<CFError>? = nil
+                var error: Unmanaged<CFError>?
 
                 guard
                     let fontUrl = Bundle.main.url(forResource: assetKey, withExtension: nil),
@@ -69,8 +68,6 @@ public class FontRegistry {
 
                 FontRegistry.register(family: family, fontName: fontName)
             }
-
         }
-
     }
 }

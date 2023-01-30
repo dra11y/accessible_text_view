@@ -7,30 +7,31 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 /// A callback fired when the native platform text view is created.
-typedef NativeTextViewCreatedCallback = void Function(
-    NativeTextViewController controller);
+typedef AccessibleTextViewCreatedCallback = void Function(
+    AccessibleTextViewController controller);
 
 /// The accessibility behavior (currently iOS only) of the native text view.
-enum NativeTextViewBehavior {
-  /// Use the default accessibility behavior of the platform.
-  /// On iOS, this has limitations when more than one link is embedded in the text view.
-  /// One in particular is lack of Switch Control access to links using Apple's default behavior.
-  platformDefault,
-
-  /// Augments Apple's default accessibility behavior in two ways:
+enum AccessibleTextViewBehavior {
+  /// Augments Apple's default accessibility behavior in the following ways:
   /// 1. Adds a long-press context menu popup with all of the links (like Android);
   /// 2. Make all links available and focusable with Switch Control on iOS.
-  platformDefaultPlusLinksLongPressMenu,
+  /// 3. When there are multiple links, prevents user from accidentally activating the first link.
+  longPressMenu,
 
   /// Overrides Apple's default accessibility behavior, and makes all non-link and
   /// link nodes separately focusable, similar to Safari. This works with both
   /// VoiceOver and Switch Control.
   linksAsFocusNodes,
+
+  /// Use the default accessibility behavior of the platform.
+  /// On iOS, this has limitations when more than one link is embedded in the text view.
+  /// One in particular is lack of Switch Control access to links using Apple's default behavior.
+  platformDefault,
 }
 
 /// Renders a native text view platform widget.
-class NativeTextView extends StatefulWidget {
-  const NativeTextView({
+class AccessibleTextView extends StatefulWidget {
+  const AccessibleTextView({
     super.key,
 
     /// Only accepts very simple HTML, such as links, boldface, and paragraph
@@ -57,11 +58,10 @@ class NativeTextView extends StatefulWidget {
     /// Override dark or light mode. On iOS, this is currently the only way to prevent
     /// the long-press menu from a very annoying color invert if your app's theme does not
     /// follow the system theme.
-    this.appearance = NativeTextViewAppearance.system,
+    this.appearance = AccessibleTextViewAppearance.system,
 
     /// See the `NativeTextViewBehavior` enum for more info.
-    this.accessibilityBehaviorIOS =
-        NativeTextViewBehavior.platformDefaultPlusLinksLongPressMenu,
+    this.accessibilityBehaviorIOS = AccessibleTextViewBehavior.longPressMenu,
 
     /// Callback fired when the native platform view is created.
     this.onTextViewCreated,
@@ -85,23 +85,36 @@ class NativeTextView extends StatefulWidget {
   final bool autoLinkify;
   final bool isSelectable;
   final int maxLines;
-  final NativeTextViewAppearance appearance;
-  final NativeTextViewBehavior accessibilityBehaviorIOS;
-  final NativeTextViewCreatedCallback? onTextViewCreated;
+  final AccessibleTextViewAppearance appearance;
+  final AccessibleTextViewBehavior accessibilityBehaviorIOS;
+  final AccessibleTextViewCreatedCallback? onTextViewCreated;
   final bool passTapAndLongPressGesturesToNativeView;
 
   @override
-  State<NativeTextView> createState() => _NativeTextViewState();
+  State<AccessibleTextView> createState() => _AccessibleTextViewState();
 }
 
 /// The persistent state of the native platform text view.
-class _NativeTextViewState extends State<NativeTextView> {
-  NativeTextViewController? controller;
+class _AccessibleTextViewState extends State<AccessibleTextView> {
+  AccessibleTextViewController? controller;
+
+  GlobalKey key = GlobalKey();
+
+  late AccessibleTextViewBehavior accessibilityBehaviorIOS =
+      widget.accessibilityBehaviorIOS;
 
   double wantedHeight = 0;
 
   Widget buildPlatformWidget(
-      BuildContext context, NativeAccessibleTextViewOptions options) {
+      BuildContext context, AccessibleTextViewOptions options) {
+    if (accessibilityBehaviorIOS != widget.accessibilityBehaviorIOS) {
+      setState(() {
+        accessibilityBehaviorIOS = widget.accessibilityBehaviorIOS;
+        key = GlobalKey();
+        print('update behavior: $accessibilityBehaviorIOS');
+      });
+    }
+
     final gestureRecognizers = widget.passTapAndLongPressGesturesToNativeView
         ? <Factory<OneSequenceGestureRecognizer>>{
             Factory<TapGestureRecognizer>(
@@ -115,12 +128,14 @@ class _NativeTextViewState extends State<NativeTextView> {
 
     if (defaultTargetPlatform == TargetPlatform.android) {
       return AndroidView(
+        key: key,
         viewType: 'com.dra11y.flutter/accessible_text_view',
         onPlatformViewCreated: (id) => _onPlatformViewCreated(id, options),
         gestureRecognizers: gestureRecognizers,
       );
     } else if (defaultTargetPlatform == TargetPlatform.iOS) {
       return UiKitView(
+        key: key,
         viewType: 'com.dra11y.flutter/accessible_text_view',
         gestureRecognizers: gestureRecognizers,
         onPlatformViewCreated: (id) => _onPlatformViewCreated(id, options),
@@ -133,7 +148,7 @@ class _NativeTextViewState extends State<NativeTextView> {
   @override
   Widget build(BuildContext context) {
     final defaultTextStyle = DefaultTextStyle.of(context).style;
-    final options = NativeAccessibleTextViewOptions(
+    final options = AccessibleTextViewOptions(
       html: widget.html,
       textColor: widget.textColor ?? defaultTextStyle.color,
       textWeight: widget.textWeight ?? FontWeight.normal,
@@ -167,8 +182,8 @@ class _NativeTextViewState extends State<NativeTextView> {
     }
   }
 
-  void _onPlatformViewCreated(int id, NativeAccessibleTextViewOptions options) {
-    final controller = NativeTextViewController._(id);
+  void _onPlatformViewCreated(int id, AccessibleTextViewOptions options) {
+    final controller = AccessibleTextViewController._(id);
     controller.setOptions(options);
     controller.wantsHeight = _wantsHeight;
     this.controller = controller;
@@ -177,15 +192,15 @@ class _NativeTextViewState extends State<NativeTextView> {
 }
 
 /// Used to override the appearance of the native platform text view on iOS.
-enum NativeTextViewAppearance {
+enum AccessibleTextViewAppearance {
   light,
   dark,
   system,
 }
 
 /// Set the options of the native platform text view widget.
-class NativeAccessibleTextViewOptions {
-  NativeAccessibleTextViewOptions({
+class AccessibleTextViewOptions {
+  AccessibleTextViewOptions({
     this.html,
     this.textColor,
     this.textWeight,
@@ -214,8 +229,8 @@ class NativeAccessibleTextViewOptions {
   final bool? autoLinkify;
   final bool? isSelectable;
   final int? maxLines;
-  final NativeTextViewAppearance? appearance;
-  final NativeTextViewBehavior? accessibilityBehaviorIOS;
+  final AccessibleTextViewAppearance? appearance;
+  final AccessibleTextViewBehavior? accessibilityBehaviorIOS;
 
   String toJson() => jsonEncode(toMap());
 
@@ -245,8 +260,8 @@ extension ColorExtension on Color {
 }
 
 /// A controller for the native platform text view to facilitate communication with Flutter.
-class NativeTextViewController {
-  NativeTextViewController._(int id)
+class AccessibleTextViewController {
+  AccessibleTextViewController._(int id)
       : _channel =
             MethodChannel('com.dra11y.flutter/accessible_text_view_$id') {
     _channel.setMethodCallHandler(onMethodCall);
@@ -265,7 +280,7 @@ class NativeTextViewController {
     }
   }
 
-  Future<void> setOptions(NativeAccessibleTextViewOptions options) async {
+  Future<void> setOptions(AccessibleTextViewOptions options) async {
     return await _channel.invokeMethod('setOptions', options.toJson());
   }
 }
