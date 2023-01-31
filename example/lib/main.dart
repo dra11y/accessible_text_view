@@ -18,14 +18,12 @@ class TextViewExample extends StatefulWidget {
 
 class _TextViewExampleState extends State<TextViewExample> {
   bool isFlutterTextView = false;
-  AccessibleTextViewBehavior behaviorIOS =
-      AccessibleTextViewBehavior.longPressMenu;
 
   Widget get accessibleTextView => AccessibleTextView(
         html: """
     <p>This is an AccessibleTextView widget. Its behavior is more correct on Android and more flexible on iOS.</p>
-    <p>This is a second paragraph.</p>
-    <p>This is an example text with phone number 555-234-2345 with an e-mail link of test@example.com and an external link to <a href="https://google.com">Google</a>.
+    <p>This is a second paragraph with one <a href="https://google.com">Google</a> link.</p>
+    <p>This is an example text with phone number 555-234-2345 with an e-mail link of test@example.com and a web link to <a href="https://google.com">Google</a>.
     On Android, TalkBack should indicate each link with a blip sound.
     On iOS, VoiceOver should navigate each non-link and link chunk separately.</p>
     <p>This component really should not be used for long text, because it is not designed for long text. For that, use a web view.</p>
@@ -35,7 +33,6 @@ class _TextViewExampleState extends State<TextViewExample> {
         linkWeight: FontWeight.w600,
         linkColor: Colors.blueAccent,
         appearance: AccessibleTextViewAppearance.dark,
-        accessibilityBehaviorIOS: behaviorIOS,
         fontSize: 14,
       );
 
@@ -125,45 +122,6 @@ class _TextViewExampleState extends State<TextViewExample> {
               child: Text(
                   'Switch to ${isFlutterTextView ? 'Native AccessibleTextView' : 'Flutter Text.rich'}'),
             ),
-            if (Platform.isIOS && !isFlutterTextView) ...[
-              Text('AccessibleTextViewBehavior', style: normalStyle),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: ToggleButtons(
-                  isSelected: [
-                    behaviorIOS == AccessibleTextViewBehavior.longPressMenu,
-                    behaviorIOS == AccessibleTextViewBehavior.linksAsFocusNodes,
-                    behaviorIOS == AccessibleTextViewBehavior.platformDefault,
-                  ],
-                  children: AccessibleTextViewBehavior.values
-                      .map(
-                        (behavior) => Container(
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              width: 3,
-                              color: behavior == behaviorIOS
-                                  ? Colors.yellow
-                                  : Colors.transparent,
-                            ),
-                          ),
-                          child: TextButton(
-                            onPressed: () {
-                              setState(() => behaviorIOS = behavior);
-                            },
-                            child: Text(
-                              behavior.name,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                              ),
-                            ),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                ),
-              ),
-            ],
             Expanded(
               flex: 3,
               child: isFlutterTextView ? flutterTextView : accessibleTextView,

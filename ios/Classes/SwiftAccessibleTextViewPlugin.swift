@@ -62,7 +62,7 @@ public enum FontRegistry {
                     CTFontManagerRegisterGraphicsFont(cgFont, &error),
                     UIFont(name: fontName, size: 24) != nil
                 else {
-//                    assertionFailure("Could not register font family: \(family) with asset path: \(fontAsset.asset). ERROR: \(String(describing: error))\nFONT MANIFEST: \(manifest)")
+                    assertionFailure("Could not register font family: \(family) with asset path: \(fontAsset.asset). ERROR: \(String(describing: error))\nFONT MANIFEST: \(manifest)")
                     return
                 }
 

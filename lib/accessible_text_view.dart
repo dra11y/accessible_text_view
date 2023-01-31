@@ -10,25 +10,6 @@ import 'package:flutter/services.dart';
 typedef AccessibleTextViewCreatedCallback = void Function(
     AccessibleTextViewController controller);
 
-/// The accessibility behavior (currently iOS only) of the native text view.
-enum AccessibleTextViewBehavior {
-  /// Augments Apple's default accessibility behavior in the following ways:
-  /// 1. Adds a long-press context menu popup with all of the links (like Android);
-  /// 2. Make all links available and focusable with Switch Control on iOS.
-  /// 3. When there are multiple links, prevents user from accidentally activating the first link.
-  longPressMenu,
-
-  /// Overrides Apple's default accessibility behavior, and makes all non-link and
-  /// link nodes separately focusable, similar to Safari. This works with both
-  /// VoiceOver and Switch Control.
-  linksAsFocusNodes,
-
-  /// Use the default accessibility behavior of the platform.
-  /// On iOS, this has limitations when more than one link is embedded in the text view.
-  /// One in particular is lack of Switch Control access to links using Apple's default behavior.
-  platformDefault,
-}
-
 /// Renders a native text view platform widget.
 class AccessibleTextView extends StatefulWidget {
   const AccessibleTextView({
@@ -60,9 +41,6 @@ class AccessibleTextView extends StatefulWidget {
     /// follow the system theme.
     this.appearance = AccessibleTextViewAppearance.system,
 
-    /// See the `NativeTextViewBehavior` enum for more info.
-    this.accessibilityBehaviorIOS = AccessibleTextViewBehavior.longPressMenu,
-
     /// Callback fired when the native platform view is created.
     this.onTextViewCreated,
 
@@ -86,7 +64,6 @@ class AccessibleTextView extends StatefulWidget {
   final bool isSelectable;
   final int maxLines;
   final AccessibleTextViewAppearance appearance;
-  final AccessibleTextViewBehavior accessibilityBehaviorIOS;
   final AccessibleTextViewCreatedCallback? onTextViewCreated;
   final bool passTapAndLongPressGesturesToNativeView;
 
@@ -100,21 +77,10 @@ class _AccessibleTextViewState extends State<AccessibleTextView> {
 
   GlobalKey key = GlobalKey();
 
-  late AccessibleTextViewBehavior accessibilityBehaviorIOS =
-      widget.accessibilityBehaviorIOS;
-
   double wantedHeight = 0;
 
   Widget buildPlatformWidget(
       BuildContext context, AccessibleTextViewOptions options) {
-    if (accessibilityBehaviorIOS != widget.accessibilityBehaviorIOS) {
-      setState(() {
-        accessibilityBehaviorIOS = widget.accessibilityBehaviorIOS;
-        key = GlobalKey();
-        print('update behavior: $accessibilityBehaviorIOS');
-      });
-    }
-
     final gestureRecognizers = widget.passTapAndLongPressGesturesToNativeView
         ? <Factory<OneSequenceGestureRecognizer>>{
             Factory<TapGestureRecognizer>(
@@ -161,7 +127,6 @@ class _AccessibleTextViewState extends State<AccessibleTextView> {
       isSelectable: widget.isSelectable,
       maxLines: widget.maxLines,
       appearance: widget.appearance,
-      accessibilityBehaviorIOS: widget.accessibilityBehaviorIOS,
     );
 
     return Semantics(
@@ -213,7 +178,6 @@ class AccessibleTextViewOptions {
     this.isSelectable,
     this.maxLines,
     this.appearance,
-    this.accessibilityBehaviorIOS,
   });
 
   final String? html;
@@ -230,7 +194,6 @@ class AccessibleTextViewOptions {
   final bool? isSelectable;
   final int? maxLines;
   final AccessibleTextViewAppearance? appearance;
-  final AccessibleTextViewBehavior? accessibilityBehaviorIOS;
 
   String toJson() => jsonEncode(toMap());
 
@@ -249,7 +212,6 @@ class AccessibleTextViewOptions {
       'isSelectable': isSelectable,
       'maxLines': maxLines,
       'appearance': appearance?.name,
-      if (isIOS) 'accessibilityBehavior': accessibilityBehaviorIOS?.name,
     };
   }
 }

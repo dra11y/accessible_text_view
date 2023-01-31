@@ -33,12 +33,6 @@ public extension CGRect {
     var center: CGPoint { .init(x: midX, y: midY) }
 }
 
-public enum AccessibilityBehavior: String, Codable {
-    case platformDefault
-    case longPressMenu
-    case linksAsFocusNodes
-}
-
 public enum TextViewAppearance: String, Codable {
     case light
     case dark
@@ -73,7 +67,6 @@ public struct AccessibleTextViewOptions: Codable {
     let appearance: TextViewAppearance?
     let errorCode: String?
     let errorMessage: String?
-    let accessibilityBehavior: AccessibilityBehavior?
 
     public init(
         html: String? = nil,
@@ -90,8 +83,7 @@ public struct AccessibleTextViewOptions: Codable {
         maxLines: Int? = nil,
         appearance: TextViewAppearance? = nil,
         errorCode: String? = nil,
-        errorMessage: String? = nil,
-        accessibilityBehavior: AccessibilityBehavior? = nil
+        errorMessage: String? = nil
     ) {
         self.html = html
         self.textColor = textColor
@@ -108,7 +100,6 @@ public struct AccessibleTextViewOptions: Codable {
         self.appearance = appearance
         self.errorCode = errorCode
         self.errorMessage = errorMessage
-        self.accessibilityBehavior = accessibilityBehavior
     }
 
     func uiTextWeight() -> CGFloat? {
@@ -185,50 +176,73 @@ public struct AccessibleTextViewOptions: Codable {
     }
 }
 
-public class URLAccessibilityElement: UIAccessibilityElement {
-    public var url: NSURL?
-
-    override public func accessibilityElementDidBecomeFocused() {
-        (accessibilityContainer as? MyTextView)?.elementFocused(self)
-    }
-
-    override public func accessibilityActivate() -> Bool {
-        guard let url = url else { return false }
-        UIApplication.shared.open(url as URL)
-        return true
-    }
-
-    // Do not focus with Switch Control if we don't have a URL.
-    override public var accessibilityRespondsToUserInteraction: Bool {
-        get { url != nil }
-        set {}
-    }
-
-    override public var accessibilityTraits: UIAccessibilityTraits {
-        get { url == nil ? super.accessibilityTraits : super.accessibilityTraits.union(.link) }
-        set { super.accessibilityTraits = newValue }
-    }
-}
-
 public class MyTextView: UITextView, UITextViewDelegate, UIContextMenuInteractionDelegate {
     @available(iOS 13.0, *)
     public func contextMenuInteraction(_: UIContextMenuInteraction, configurationForMenuAtLocation _: CGPoint) -> UIContextMenuConfiguration? {
         return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { [weak self] _ -> UIMenu? in
             guard let self = self else { return nil }
 
-            let actions = self.popupLinks.map { link in
-                UIAction(title: link.substring.string) { _ in
+            let actions = self.links.compactMap { link in
+                UIAction(title: link.title) { _ in
                     UIApplication.shared.open(link.url)
                 }
             }
 
-            return UIMenu(title: "Links", children: actions)
+            return UIMenu(title: actions.count == 1 ? "Link" : "Links", children: actions)
+        }
+    }
+    
+    public var didDetectVoiceControl: Bool = false
+
+    private struct Link {
+        let title: String
+        let url: URL
+    }
+
+    private var links: [Link] {
+        guard
+            let paragraphs = self.accessibilityElements as? [UIAccessibilityElement],
+            let links = paragraphs.flatMap({ $0.accessibilityElements ?? [] }) as? [UIAccessibilityElement]
+        else { return [] }
+
+        return links.compactMap { link -> Link? in
+            guard
+                link.responds(to: NSSelectorFromString("url")),
+                let url = link.value(forKey: "url") as? URL,
+                let title = link.accessibilityLabel
+            else { return nil }
+
+            return Link(title: title, url: url)
         }
     }
 
-    override public func accessibilityActivate() -> Bool {
-        UIAccessibility.post(notification: .layoutChanged, argument: self)
-        return false
+    override public init(frame: CGRect, textContainer: NSTextContainer?) {
+        super.init(frame: frame, textContainer: textContainer)
+        addATObservers()
+        updateAccessibility()
+    }
+
+    private func updateAccessibility() {
+        AXUITextViewParagraphElementSwizzler.swizzleIfNeeded()
+
+        guard let linksMenuInteraction = linksMenuInteraction else { return }
+        if UIAccessibility.isVoiceOverRunning {
+            addInteraction(linksMenuInteraction)
+        } else {
+            removeInteraction(linksMenuInteraction)
+        }
+    }
+
+    private lazy var linksMenuInteraction: UIInteraction? = {
+        if #available(iOS 13.0, *) {
+            return UIContextMenuInteraction(delegate: self)
+        }
+        return nil
+    }()
+
+    @available(*, unavailable)
+    required init?(coder _: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 
     public var channel: FlutterMethodChannel?
@@ -237,178 +251,133 @@ public class MyTextView: UITextView, UITextViewDelegate, UIContextMenuInteractio
         return true
     }
 
-    public var accessibilityBehavior: AccessibilityBehavior = .platformDefault
+    private var atObservers: [NSObjectProtocol]?
 
-    private var focusNodeElements = [URLAccessibilityElement]()
-    private var voiceOverObserver: NSObjectProtocol?
-    private var updateAccessibilityTask: DispatchWorkItem?
+    private var modifiedRotors: [UIAccessibilityCustomRotor]?
 
-    func elementFocused(_: URLAccessibilityElement) {
-//        guard
-//            let rectInScreen = element.accessibilityPath?.bounds,
-//            let rectInWindow = window?.convert(rectInScreen, from: nil)
-//        else { return }
-//        let rectInView = convert(rectInWindow, from: nil)
+    override public var accessibilityHint: String? {
+        get {
+            links.count < 2
+                ? super.accessibilityHint
+                : "To access \(links.count) links, use the rotor, or double-tap and hold for context menu."
+        }
+        set { }
     }
 
-    public func scrollViewDidScroll(_: UIScrollView) {
-        updateAccessibility()
+    private func wrapSearchBlock(originalRotor: UIAccessibilityCustomRotor) -> UIAccessibilityCustomRotor {
+        let originalSearchBlock = originalRotor.itemSearchBlock
+
+        let newBlock: UIAccessibilityCustomRotor.Search = { [weak self] predicate -> UIAccessibilityCustomRotorItemResult in
+
+            guard
+                let self = self,
+                let originalResult = originalSearchBlock(predicate)
+            else { return UIAccessibilityCustomRotorItemResult() }
+
+            let paragraphs = self.accessibilityElements as? [UIAccessibilityElement] ?? []
+
+            let fallbackTarget = (
+                paragraphs.first {
+                    $0.accessibilityElements?.count ?? 0 > 0
+                } ?? paragraphs.first ?? self)
+
+            guard
+                predicate.searchDirection == .previous,
+                let focusedLink = predicate.currentItem.targetElement as? UIAccessibilityElement
+            else { return originalResult }
+
+            let isParagraph = focusedLink.accessibilityElements?.count ?? 0 > 0
+            let newTarget: UIAccessibilityElement?
+
+            if
+                isParagraph,
+                let index = paragraphs.firstIndex(where: { $0 == focusedLink }),
+                index > 0
+            {
+                let previousParagraph = paragraphs[index - 1]
+                let lastLinkOfPreviousParagraph = previousParagraph.accessibilityElements?.last as? UIAccessibilityElement
+                newTarget = lastLinkOfPreviousParagraph ?? previousParagraph
+            }
+            else if
+                let containingParagraph = focusedLink.accessibilityContainer as? UIAccessibilityElement,
+                let firstLinkInParagraph = containingParagraph.accessibilityElements?.first as? UIAccessibilityElement,
+                focusedLink == firstLinkInParagraph
+            {
+                newTarget = containingParagraph
+            }
+            else {
+                newTarget = originalResult.targetElement as? UIAccessibilityElement
+            }
+
+            return UIAccessibilityCustomRotorItemResult(targetElement: newTarget ?? fallbackTarget, targetRange: nil)
+        }
+
+        return UIAccessibilityCustomRotor(systemType: .link, itemSearch: newBlock)
     }
 
-    private lazy var linksRotor: UIAccessibilityCustomRotor = .init(systemType: .link, itemSearch: { predicate in
-        let isForward = predicate.searchDirection == .next
-
-        guard
-            self.focusNodeElements.count > 1,
-            let current = predicate.currentItem.targetElement as? URLAccessibilityElement,
-            let currentIndex = self.focusNodeElements.firstIndex(of: current)
-        else {
-            return nil
-        }
-
-        let searchArray: [URLAccessibilityElement] = isForward ? Array(self.focusNodeElements[(currentIndex + 1) ..< self.focusNodeElements.count]) : Array(self.focusNodeElements[0 ..< currentIndex].reversed())
-
-        if let link = searchArray.first(where: { $0.url != nil }) {
-            return UIAccessibilityCustomRotorItemResult(targetElement: link, targetRange: nil)
-        }
-
-        return nil
-    })
-
+    /// Override a bad default Apple experience in which one cannot navigate back to the
+    /// paragraph text after entering the links rotor. Wrap the search block so that swiping
+    /// up on the first link returns us to the text paragraph instead of getting stuck
+    /// on the link. This still does not fix VoiceOver getting stuck when swiping
+    /// left or right on a link.
     override public var accessibilityCustomRotors: [UIAccessibilityCustomRotor]? {
         get {
-            switch accessibilityBehavior {
-            case .platformDefault:
-                return super.accessibilityCustomRotors
-            case .longPressMenu:
-                return super.accessibilityCustomRotors
-            case .linksAsFocusNodes:
-                return [linksRotor]
+            if let modifiedRotors = modifiedRotors {
+                return modifiedRotors
             }
-        }
-        set {}
-    }
+            guard let superRotors = super.accessibilityCustomRotors else { return nil }
 
-    override public var isAccessibilityElement: Bool {
-        get {
-            switch accessibilityBehavior {
-            case .platformDefault:
-                return super.isAccessibilityElement
-            case .longPressMenu:
-                return !UIAccessibility.isSwitchControlRunning
-            case .linksAsFocusNodes:
-                return false
+            
+            let rotors: [UIAccessibilityCustomRotor] = superRotors.map
+            { (rotor: UIAccessibilityCustomRotor) in
+                if rotor.systemRotorType != .link {
+                    return rotor
+                }
+                return wrapSearchBlock(originalRotor: rotor)
             }
+
+            modifiedRotors = rotors
+            return rotors
         }
         set {}
     }
 
     override public var accessibilityElements: [Any]? {
         get {
-            switch accessibilityBehavior {
-            case .platformDefault:
-                return super.accessibilityElements
-            case .longPressMenu:
-                return UIAccessibility.isSwitchControlRunning ? focusNodeElements : super.accessibilityElements
-            case .linksAsFocusNodes:
-                return focusNodeElements
+            /// We need to flatten the elements for Switch Control and Voice Control,
+            /// but NOT for VoiceOver (otherwise the plain text won't be focusable).
+            /// So, we only flatten the elements when VoiceOver is not running.
+            guard
+                !UIAccessibility.isVoiceOverRunning,
+                let elements = super.accessibilityElements as? [UIAccessibilityElement]
+            else { return super.accessibilityElements }
+
+            return elements.compactMap { element in
+                element.accessibilityElements
             }
         }
         set {}
     }
 
-    override public var attributedText: NSAttributedString! {
-        didSet {
-            updateAccessibility()
-            addVoiceOverObserverIfNeeded()
-        }
-    }
+    private func addATObservers() {
+        guard atObservers == nil else { return }
+        var observers = [NSObjectProtocol]()
+        observers.append(
+            NotificationCenter.default.addObserver(forName: UIAccessibility.voiceOverStatusDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
 
-    override public var accessibilityHint: String? {
-        get {
-            if let hint = super.accessibilityHint {
-                return hint
-            }
-            if
-                accessibilityBehavior == .longPressMenu
-                && !popupLinks.isEmpty
-            {
-                return "To access links, use the rotor, or double-tap and hold for context menu."
-            }
-            return nil
-        }
-        set { super.accessibilityHint = newValue }
-    }
+                self?.updateAccessibility()
+            })
+        observers.append(
+            NotificationCenter.default.addObserver(forName: UIAccessibility.switchControlStatusDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
 
-    private func addVoiceOverObserverIfNeeded() {
-        guard voiceOverObserver == nil else { return }
-        voiceOverObserver = NotificationCenter.default.addObserver(forName: UIAccessibility.voiceOverStatusDidChangeNotification, object: nil, queue: .main) { [weak self] _ in
-            self?.updateAccessibility(delay: 0.5)
-        }
+                self?.updateAccessibility()
+            })
+        atObservers = observers
     }
 
     override public func layoutSubviews() {
         super.layoutSubviews()
         channel?.invokeMethod("wantsHeight", arguments: contentSize.height)
-        updateAccessibility(delay: 0.5)
-    }
-
-    private typealias Link = (substring: NSAttributedString, url: URL)
-
-    private var popupLinks = [Link]()
-
-    public func updateAccessibility(delay: TimeInterval = 0.1) {
-        if accessibilityBehavior == .platformDefault { return }
-
-        updateAccessibilityTask?.cancel()
-
-        let task = DispatchWorkItem { [weak self] in
-            if self?.updateAccessibilityTask?.isCancelled == true {
-                return
-            }
-            self?.updateAccessibilityNow()
-        }
-
-        updateAccessibilityTask = task
-        DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + delay, execute: task)
-    }
-
-    private func updateAccessibilityNow() {
-        updateAccessibilityTask?.cancel()
-
-        guard let attrText = attributedText else { return }
-        switch accessibilityBehavior {
-        case .platformDefault:
-            return
-        case .linksAsFocusNodes:
-            updateLinksAsFocusNodes(attrText: attrText)
-        case .longPressMenu:
-            updateLinksAsFocusNodes(attrText: attrText, linksOnly: true)
-            updateLinksForContextMenu(attrText: attrText)
-        }
-    }
-
-    private var menuInteractionAdded = false
-
-    private func updateLinksForContextMenu(attrText: NSAttributedString) {
-        popupLinks.removeAll()
-        attrText.enumerateAttribute(
-            .link,
-            in: NSRange(0 ..< attrText.length)
-        ) {
-            value, range, _ in
-            guard let url = value as? URL else { return }
-            let text = attrText.attributedSubstring(from: range)
-            let link = Link(substring: text, url: url)
-            popupLinks.append(link)
-        }
-        if #available(iOS 13.0, *) {
-            if !menuInteractionAdded {
-                menuInteractionAdded = true
-                let interaction = UIContextMenuInteraction(delegate: self)
-                self.addInteraction(interaction)
-            }
-        }
     }
 
     override public var isSelectable: Bool {
@@ -432,92 +401,6 @@ public class MyTextView: UITextView, UITextViewDelegate, UIContextMenuInteractio
             if let attribute = attributedText.attribute(.link, at: tapOffset, effectiveRange: nil) as? URL {
                 UIApplication.shared.open(attribute)
             }
-        }
-    }
-
-    private func updateLinksAsFocusNodes(attrText: NSAttributedString, linksOnly: Bool = false) {
-        var elements = [URLAccessibilityElement]()
-        let focusedLabel = (UIAccessibility.focusedElement(using: nil) as? URLAccessibilityElement)?.accessibilityAttributedLabel
-        var focusedElement: URLAccessibilityElement?
-        attrText.enumerateAttribute(
-            .link,
-            in: NSRange(0 ..< attrText.length)
-        ) {
-            urlValue, range, _ in
-            guard
-                !linksOnly || urlValue != nil,
-                let start = position(from: beginningOfDocument, offset: range.lowerBound),
-                let end = position(from: beginningOfDocument, offset: range.upperBound),
-                let textRange = textRange(from: start, to: end)
-            else { return }
-            let rects = selectionRects(for: textRange).compactMap { rect in
-                rect.rect.isEmpty ? nil : rect.rect
-            }
-            guard
-                !rects.isEmpty,
-                let first = rects.first
-            else { return }
-            let path = UIBezierPath()
-            path.move(to: CGPoint(x: first.minX, y: first.minY))
-            for rect in rects {
-                let topRight = CGPoint(x: rect.maxX, y: rect.minY)
-                let bottomRight = CGPoint(x: rect.maxX, y: rect.maxY)
-                if topRight != path.currentPoint {
-                    path.addLine(to: topRight)
-                }
-                if bottomRight != path.currentPoint {
-                    path.addLine(to: bottomRight)
-                }
-            }
-            for rect in rects.reversed() {
-                let bottomLeft = CGPoint(x: rect.minX, y: rect.maxY)
-                let topLeft = CGPoint(x: rect.minX, y: rect.minY)
-                if bottomLeft != path.currentPoint {
-                    path.addLine(to: bottomLeft)
-                }
-                if topLeft != path.currentPoint {
-                    path.addLine(to: topLeft)
-                }
-            }
-            let text = attrText.attributedSubstring(from: range)
-            let url = urlValue as? NSURL
-            let element = URLAccessibilityElement(accessibilityContainer: self)
-            let screenPath = UIAccessibility.convertToScreenCoordinates(path, in: self)
-            element.accessibilityPath = screenPath
-            element.accessibilityFrameInContainerSpace = path.bounds
-            // This must be set or activation will not work.
-            element.accessibilityActivationPoint = screenPath.bounds.center
-            element.accessibilityAttributedLabel = text
-            if let url = url {
-                element.url = url
-                let hint: String?
-                switch url.scheme {
-                case "mailto":
-                    hint = "Compose e-mail."
-                case "tel":
-                    hint = "Dial phone number."
-                case "http", "https":
-                    if let host = url.host {
-                        hint = "Open web site at \(host)"
-                    } else {
-                        hint = "Open web site."
-                    }
-                default:
-                    hint = nil
-                }
-                element.accessibilityHint = hint
-            }
-            elements.append(element)
-            if text == focusedLabel {
-                focusedElement = element
-            }
-        }
-        focusNodeElements = elements
-        if focusedLabel != nil && focusedElement == nil {
-            focusedElement = elements.first
-        }
-        if let focusedElement = focusedElement {
-            UIAccessibility.post(notification: .layoutChanged, argument: focusedElement)
         }
     }
 }
@@ -564,10 +447,6 @@ public class TextView: NSObject, FlutterPlatformView {
         }
 
         let options = AccessibleTextViewOptions.from(json: json)
-
-        if let accessibilityBehavior = options.accessibilityBehavior {
-            textView.accessibilityBehavior = accessibilityBehavior
-        }
 
         if let attributedString = options.htmlToAttributedString() {
             textView.attributedText = attributedString
@@ -670,8 +549,6 @@ public class TextView: NSObject, FlutterPlatformView {
             textView.textContainer.maximumNumberOfLines = maxLines
             textView.textContainer.lineBreakMode = .byTruncatingTail
         }
-
-        textView.updateAccessibility(delay: 1.0)
 
         result(nil)
     }

@@ -19,9 +19,7 @@ __However, I also wish to advocate here for an option in Android to make these e
 Fortunately, `UIKit` has an `UIAccessibilityTraits.link` attribute, and thus the Flutter links within `Text` and `TextSpan`s are correctly labelled. Additionally, Flutter gets it right by making them separate focus nodes by default. Unfortunately, iOS users may still get confused, because Apple has changed `UITextView` to behave more like Android `TextView`, in that links in a `UITextView` are no longer separate focus nodes. VoiceOver users must be more advanced and know to use the links rotor to access them. It seems that screen reader users are still left largely in the dark when it comes to embedded links in text, an all too common phenomenon in native apps, e.g. terms of service, support contact info, usage instructions, etc.
 
 To brige the gap, I have enhanced the `UITextView` accessibility behavior by allowing the developer to choose one of the following beaviors appropriate to their app and the amount of text in the text view:
-  * `AccessibleTextViewBehavior.longPressMenu` - like a native `UITextView` that Apple users expect, but with enhanced hints and a links menu available on long-press (similar to the Android TalkBack behavior)
-  * `AccessibleTextViewBehavior.linksAsFocusNodes` - similar to the Flutter `TextSpan` implementation
-  * `AccessibleTextViewBehavior.platformDefault` - Apple's default behavior without any enhancements.
+
 
 You can also use platform tests to use a Flutter implementation on iOS, and use this widget on Android, but I implemented native views on both platforms to facilitate easier implementation.
 
@@ -76,8 +74,6 @@ class _HomePageState extends State<HomePage> {
               linkWeight: FontWeight.w600,
               linkColor: Colors.blueAccent,
               appearance: AccessibleTextViewAppearance.dark,
-              accessibilityBehaviorIOS:
-                AccessibleTextViewBehavior.longPressMenu,
               fontSize: 14,
             ),
           ),
