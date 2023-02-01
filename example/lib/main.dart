@@ -30,7 +30,7 @@ class _TextViewExampleState extends State<TextViewExample> {
 """,
         // textColor: Theme.of(context).colorScheme.onSurface,
         textColor: Colors.white,
-        linkWeight: FontWeight.w600,
+        linkWeight: FontWeight.bold,
         linkColor: Colors.blueAccent,
         appearance: AccessibleTextViewAppearance.dark,
         fontSize: 14,
@@ -38,7 +38,7 @@ class _TextViewExampleState extends State<TextViewExample> {
 
   final TextStyle flutterLinkStyle = const TextStyle(
     color: Colors.blueAccent,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.bold,
     decoration: TextDecoration.underline,
   );
 

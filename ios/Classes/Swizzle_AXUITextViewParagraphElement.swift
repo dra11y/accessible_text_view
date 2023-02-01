@@ -8,34 +8,23 @@
 import ObjectiveC
 import UIKit
 
-@objc protocol MyTextViewParagraphElement {
-    var numberOfLinks: Int { get }
-}
-
-private class Swizzled_AXUITextViewParagraphElement: UIAccessibilityElement, MyTextViewParagraphElement {
-    
-    @objc dynamic var numberOfLinks: Int {
-        accessibilityElements?.count ?? 0
-    }
-
+private class Swizzled_AXUITextViewParagraphElement: UIAccessibilityElement {
+    /// Don't automatically activate the first link on activation of the paragraph text.
     @objc dynamic func swizzled_accessibilityActivate() -> Bool {
-        // numberOfLinks == 1 ? swizzled_accessibilityActivate() : false
         true
     }
-    
+
+    /// Don't give the whole paragraph text a .link attribute.
     @objc dynamic var swizzled_accessibilityTraits: UIAccessibilityTraits {
-        get {
-//            numberOfLinks == 1 ? [.staticText, .link] : [.staticText]
-            .staticText
-        }
+        get { .staticText }
         set {}
     }
 
+    /// Use the hint of the parent UITextView.
     @objc dynamic var swizzled_accessibilityHint: String? {
         get { accessibilityContainer?.accessibilityHint }
-        set { }
+        set {}
     }
-
 }
 
 enum AXUITextViewParagraphElementSwizzler {
@@ -77,10 +66,6 @@ enum AXUITextViewParagraphElementSwizzler {
         if Self.isSwizzled { return }
         Self.isSwizzled = true
 
-        class_addProtocol(originalClass, MyTextViewParagraphElement.self)
-
-        add(selector: #selector(getter: Swizzled_AXUITextViewParagraphElement.numberOfLinks))
-
         swizzle(
             originalSelector: #selector(UIAccessibilityElement.accessibilityTraits),
             swizzledSelector: #selector(getter: Swizzled_AXUITextViewParagraphElement.swizzled_accessibilityTraits)
@@ -95,7 +80,6 @@ enum AXUITextViewParagraphElementSwizzler {
             originalSelector: #selector(UIAccessibilityElement.accessibilityActivate),
             swizzledSelector: #selector(Swizzled_AXUITextViewParagraphElement.swizzled_accessibilityActivate)
         )
-
     }
 
     private static func add(selector: Selector) {

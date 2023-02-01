@@ -71,7 +71,7 @@ class _HomePageState extends State<HomePage> {
             <p>This component really should not be used for long text, because it is not designed for long text. For that, use a web view.</p>
           """,
               textColor: Colors.white,
-              linkWeight: FontWeight.w600,
+              linkWeight: FontWeight.bold,
               linkColor: Colors.blueAccent,
               appearance: AccessibleTextViewAppearance.dark,
               fontSize: 14,

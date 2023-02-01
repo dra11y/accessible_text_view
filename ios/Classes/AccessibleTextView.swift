@@ -6,12 +6,30 @@
 //
 
 import Flutter
+import native_flutter_fonts
 import UIKit
 
 public extension UIFont {
+    var traits: [UIFontDescriptor.TraitKey: Any]? {
+        fontDescriptor.fontAttributes[.traits] as? [UIFontDescriptor.TraitKey: Any]
+    }
+
+    var isItalic: Bool {
+        print("slant = ?, traits = \(fontDescriptor.fontAttributes)")
+        if
+            let traits = traits,
+            let slant = traits[.slant] as? CGFloat
+        {
+            print("slant = \(slant)")
+            return slant != 0.0
+        }
+
+        return false
+    }
+
     var weight: UIFont.Weight {
         if
-            let traits = fontDescriptor.fontAttributes[.traits] as? [UIFontDescriptor.TraitKey: Any],
+            let traits = traits,
             let weight = traits[.weight] as? CGFloat
         {
             return UIFont.Weight(weight)
@@ -112,10 +130,8 @@ public struct AccessibleTextViewOptions: Codable {
 
     func uiFontWeight(_ weight: Int?) -> CGFloat? {
         guard let weight = weight else { return nil }
-        let normalizedInt = CGFloat(weight - 400)
-        // Flutter normal weight = 400, min = 100, max = 900
-        // iOS min weight = -1.0, normal = 0.0, max = 1.0
-        return normalizedInt < 0 ? normalizedInt / 300.0 : normalizedInt / 500.0
+
+        return FlutterFontRegistry.appleWeightFromFlutterWeight(weight)
     }
 
     func uiTextColor() -> UIColor? {
@@ -130,8 +146,12 @@ public struct AccessibleTextViewOptions: Codable {
         uiColor(backgroundColor)
     }
 
-    func uiFont() -> UIFont? {
-        FontRegistry.resolve(family: fontFamily, size: fontSize)
+    func uiTextFont() -> UIFont? {
+        FlutterFontRegistry.resolve(family: fontFamily, size: fontSize, weight: textWeight)
+    }
+
+    func uiLinkFont() -> UIFont? {
+        FlutterFontRegistry.resolve(family: fontFamily, size: fontSize, weight: linkWeight)
     }
 
     private func uiColor(_ array: [CGFloat]?) -> UIColor? {
@@ -191,7 +211,7 @@ public class MyTextView: UITextView, UITextViewDelegate, UIContextMenuInteractio
             return UIMenu(title: actions.count == 1 ? "Link" : "Links", children: actions)
         }
     }
-    
+
     public var didDetectVoiceControl: Bool = false
 
     private struct Link {
@@ -257,11 +277,10 @@ public class MyTextView: UITextView, UITextViewDelegate, UIContextMenuInteractio
 
     override public var accessibilityHint: String? {
         get {
-            links.count < 2
-                ? super.accessibilityHint
-                : "To access \(links.count) links, use the rotor, or double-tap and hold for context menu."
+            links.count == 0 ? nil :
+                "To access \(links.count == 1 ? "link" : "\(links.count) links"), use the rotor, or double-tap and hold for context menu."
         }
-        set { }
+        set {}
     }
 
     private func wrapSearchBlock(originalRotor: UIAccessibilityCustomRotor) -> UIAccessibilityCustomRotor {
@@ -297,15 +316,13 @@ public class MyTextView: UITextView, UITextViewDelegate, UIContextMenuInteractio
                 let previousParagraph = paragraphs[index - 1]
                 let lastLinkOfPreviousParagraph = previousParagraph.accessibilityElements?.last as? UIAccessibilityElement
                 newTarget = lastLinkOfPreviousParagraph ?? previousParagraph
-            }
-            else if
+            } else if
                 let containingParagraph = focusedLink.accessibilityContainer as? UIAccessibilityElement,
                 let firstLinkInParagraph = containingParagraph.accessibilityElements?.first as? UIAccessibilityElement,
                 focusedLink == firstLinkInParagraph
             {
                 newTarget = containingParagraph
-            }
-            else {
+            } else {
                 newTarget = originalResult.targetElement as? UIAccessibilityElement
             }
 
@@ -327,14 +344,13 @@ public class MyTextView: UITextView, UITextViewDelegate, UIContextMenuInteractio
             }
             guard let superRotors = super.accessibilityCustomRotors else { return nil }
 
-            
             let rotors: [UIAccessibilityCustomRotor] = superRotors.map
-            { (rotor: UIAccessibilityCustomRotor) in
-                if rotor.systemRotorType != .link {
-                    return rotor
+                { (rotor: UIAccessibilityCustomRotor) in
+                    if rotor.systemRotorType != .link {
+                        return rotor
+                    }
+                    return wrapSearchBlock(originalRotor: rotor)
                 }
-                return wrapSearchBlock(originalRotor: rotor)
-            }
 
             modifiedRotors = rotors
             return rotors
@@ -406,6 +422,9 @@ public class MyTextView: UITextView, UITextViewDelegate, UIContextMenuInteractio
 }
 
 public class TextView: NSObject, FlutterPlatformView {
+    public var textFont: UIFont?
+    public var linkFont: UIFont?
+
     public func view() -> UIView {
         textView
     }
@@ -422,6 +441,7 @@ public class TextView: NSObject, FlutterPlatformView {
         textView = MyTextView(frame: frame)
         textView.isEditable = false
         textView.isUserInteractionEnabled = true
+        /// The following doesn't seem to work reliably, so we manually implement below.
         // textView.dataDetectorTypes = .all
         textView.delegate = textView
         textView.channel = channel
@@ -454,14 +474,17 @@ public class TextView: NSObject, FlutterPlatformView {
 
         textView.adjustsFontForContentSizeCategory = true
 
-        let textFont: UIFont
-        if let font = options.uiFont() {
-            textFont = UIFontMetrics.default.scaledFont(for: font)
-        } else {
-            textFont = textView.font ?? UIFontMetrics.default.scaledFont(for: UIFont.systemFont(ofSize: UIFont.systemFontSize))
+        if let textFont = options.uiTextFont() {
+            self.textFont = textFont
+        }
+        if let linkFont = options.uiLinkFont() {
+            self.linkFont = linkFont
         }
 
-        textView.font = textFont
+        let textFont: UIFont = self.textFont ?? UIFont.systemFont(ofSize: UIFont.systemFontSize)
+        let linkFont: UIFont = self.linkFont ?? UIFont.systemFont(ofSize: UIFont.systemFontSize)
+
+        textView.font = UIFontMetrics.default.scaledFont(for: textFont)
 
         if let textColor = options.uiTextColor() {
             textView.textColor = textColor
@@ -486,13 +509,14 @@ public class TextView: NSObject, FlutterPlatformView {
 
         let linkWeight = options.uiLinkWeight() ?? textWeight
 
-        let descriptor = textFont.fontDescriptor.addingAttributes([
+        let descriptor = linkFont.fontDescriptor.addingAttributes([
             UIFontDescriptor.AttributeName.traits: [
                 UIFontDescriptor.TraitKey.weight: linkWeight,
             ],
         ])
-        let linkFont = UIFont(descriptor: descriptor, size: textFont.pointSize)
-        linkAttributes[.font] = linkFont
+        let updatedLinkFont = UIFontMetrics.default.scaledFont(
+            for: UIFont(descriptor: descriptor, size: textFont.pointSize))
+        linkAttributes[.font] = updatedLinkFont
         linkAttributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
         textView.linkTextAttributes = linkAttributes
 
