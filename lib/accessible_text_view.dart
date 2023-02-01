@@ -198,7 +198,6 @@ class AccessibleTextViewOptions {
   String toJson() => jsonEncode(toMap());
 
   Map<String, dynamic> toMap() {
-    final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
     return {
       'html': html,
       'textColor': textColor?.argb,
