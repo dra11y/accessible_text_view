@@ -3,7 +3,6 @@ description: A native iOS and Android Text View that improves accessibility of e
 version: 1.0.1
 homepage: https://dra11y.com
 repository: https://github.com/dra11y/accessible_text_view
-publish_to: none
 
 environment:
   sdk: '>=2.18.6 <3.0.0'
