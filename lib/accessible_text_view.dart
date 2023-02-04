@@ -141,7 +141,6 @@ class _AccessibleTextViewState extends State<AccessibleTextView> {
   }
 
   void _wantsHeight(double? height) {
-    print('CALLED _wantsHeight: $height');
     if (height == null) return;
     if (height != wantedHeight) {
       setState(() {
@@ -154,7 +153,6 @@ class _AccessibleTextViewState extends State<AccessibleTextView> {
     final controller = AccessibleTextViewController._(id);
     controller.setOptions(options);
     controller.wantsHeight = _wantsHeight;
-    print('controller = $controller, _wantsHeight = $_wantsHeight');
     this.controller = controller;
     widget.onTextViewCreated?.call(controller);
   }
