@@ -7,7 +7,7 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "1.0.0"
+    version: "1.0.1"
   async:
     dependency: transitive
     description:
@@ -131,10 +131,10 @@ packages:
     dependency: transitive
     description:
       name: native_flutter_fonts
-      sha256: "2ccb683390c5deb3693ef78bffc1de5d27c89687da05726463d772cedf31f88b"
+      sha256: "1d1b4866f8eb90bdfd86a1e95538a12cb0816b53a9b9bca7659017bef33f23ab"
       url: "https://pub.dev"
     source: hosted
-    version: "1.0.0"
+    version: "1.0.1"
   path:
     dependency: transitive
     description:
@@ -277,5 +277,5 @@ packages:
     source: hosted
     version: "2.1.4"
 sdks:
-  dart: ">=2.19.0 <4.0.0"
+  dart: ">=2.19.0 <3.0.0"
   flutter: ">=3.0.0"

@@ -8,13 +8,6 @@ import android.text.TextPaint
 import android.text.style.URLSpan
 import android.text.util.Linkify
 
-fun Typeface.withWeight(weight: Int): Typeface = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-    Typeface.create(this, weight, isItalic)
-} else {
-    val style = if (weight > 400) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
-    Typeface.create(this, style.style)
-}
-
 fun Spannable.autoLinkify() {
     val autoSpannable = SpannableString(this)
     Linkify.addLinks(autoSpannable, Linkify.ALL)

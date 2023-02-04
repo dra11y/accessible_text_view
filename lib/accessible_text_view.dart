@@ -77,7 +77,8 @@ class _AccessibleTextViewState extends State<AccessibleTextView> {
 
   GlobalKey key = GlobalKey();
 
-  double wantedHeight = 0;
+  // Must be at least 1 or view won't be created on Android.
+  double wantedHeight = 1;
 
   Widget buildPlatformWidget(
       BuildContext context, AccessibleTextViewOptions options) {
@@ -139,7 +140,9 @@ class _AccessibleTextViewState extends State<AccessibleTextView> {
     );
   }
 
-  void _wantsHeight(double height) {
+  void _wantsHeight(double? height) {
+    print('CALLED _wantsHeight: $height');
+    if (height == null) return;
     if (height != wantedHeight) {
       setState(() {
         wantedHeight = height;
@@ -151,6 +154,7 @@ class _AccessibleTextViewState extends State<AccessibleTextView> {
     final controller = AccessibleTextViewController._(id);
     controller.setOptions(options);
     controller.wantsHeight = _wantsHeight;
+    print('controller = $controller, _wantsHeight = $_wantsHeight');
     this.controller = controller;
     widget.onTextViewCreated?.call(controller);
   }
@@ -229,12 +233,12 @@ class AccessibleTextViewController {
   }
 
   final MethodChannel _channel;
-  void Function(double height)? wantsHeight;
+  void Function(double? height)? wantsHeight;
 
   Future<void> onMethodCall(MethodCall call) async {
     switch (call.method) {
       case 'wantsHeight':
-        wantsHeight?.call(call.arguments as double);
+        wantsHeight?.call(double.tryParse(call.arguments.toString()));
         break;
       default:
         break;

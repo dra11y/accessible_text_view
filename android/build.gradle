@@ -27,7 +27,7 @@ apply plugin: 'kotlin-android'
 apply plugin: 'kotlinx-serialization'
 
 android {
-    compileSdkVersion 31
+    compileSdkVersion 32
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
@@ -44,6 +44,7 @@ android {
 
     defaultConfig {
         minSdkVersion 16
+        targetSdkVersion 32
     }
 }
 
