@@ -29,7 +29,7 @@ private class Swizzled_AXUITextViewParagraphElement: UIAccessibilityElement {
 
 enum AXUITextViewParagraphElementSwizzler {
     private static var isSwizzled = false // Make idempotent
-    private static var retries = 2
+    private static var retries = 3
 
     private static let swizzledClass: AnyClass = Swizzled_AXUITextViewParagraphElement.self
 

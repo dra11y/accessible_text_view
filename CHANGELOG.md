@@ -1,3 +1,11 @@
+## 1.1.0
+
+* Breaking change: now uses `TextStyle` for text and link styles.
+* Fix line height computation on Android.
+* Allow Flutter font text scaling behavior on iOS.
+* Graceful fallback to system font sizes when `fontSize` is not provided.
+* Demonstrates `native_segments` accessible segmented control plugin in the example.
+
 ## 1.0.3
 
 * Bump native_flutter_fonts version.

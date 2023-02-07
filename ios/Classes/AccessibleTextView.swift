@@ -15,12 +15,10 @@ public extension UIFont {
     }
 
     var isItalic: Bool {
-        print("slant = ?, traits = \(fontDescriptor.fontAttributes)")
         if
             let traits = traits,
             let slant = traits[.slant] as? CGFloat
         {
-            print("slant = \(slant)")
             return slant != 0.0
         }
 
@@ -51,10 +49,9 @@ public extension CGRect {
     var center: CGPoint { .init(x: midX, y: midY) }
 }
 
-public enum TextViewAppearance: String, Codable {
+public enum Brightness: String, Codable {
     case light
     case dark
-    case system
 
     @available(iOS 12.0, *)
     public var userInterfaceStyle: UIUserInterfaceStyle {
@@ -63,114 +60,162 @@ public enum TextViewAppearance: String, Codable {
             return .light
         case .dark:
             return .dark
-        case .system:
-            return .unspecified
         }
     }
 }
 
-public struct AccessibleTextViewOptions: Codable {
-    let html: String?
-    let textColor: [CGFloat]?
-    let linkColor: [CGFloat]?
-    let textWeight: Int?
-    let linkWeight: Int?
-    let backgroundColor: [CGFloat]?
+public typealias APIColor = [CGFloat]
+
+extension APIColor {
+    public var uiColor: UIColor? {
+        guard count == 4
+        else { return nil }
+
+        let red = self[1] / 255.0
+        let green = self[2] / 255.0
+        let blue = self[3] / 255.0
+        let alpha = self[0] / 255.0
+
+        return UIColor(red: red, green: green, blue: blue, alpha: alpha)
+    }
+}
+
+public class TextStyle: Codable {
+    let color: APIColor?
+    let backgroundColor: APIColor?
     let fontFamily: String?
     let fontSize: CGFloat?
+    let fontWeight: Int?
+    let fontStyle: String?
+    let letterSpacing: CGFloat?
+    let wordSpacing: CGFloat?
+    let height: CGFloat?
+    let decoration: String?
+    let decorationColor: APIColor?
+    let decorationStyle: String?
+    let decorationThickness: CGFloat?
+    let overflow: String?
+
+    public init(
+        color: APIColor?,
+        backgroundColor: APIColor?,
+        fontFamily: String?,
+        fontSize: CGFloat?,
+        fontWeight: Int?,
+        fontStyle: String?,
+        letterSpacing: CGFloat?,
+        wordSpacing: CGFloat?,
+        height: CGFloat?,
+        decoration: String?,
+        decorationColor: APIColor?,
+        decorationStyle: String?,
+        decorationThickness: CGFloat?,
+        overflow: String?
+    ) {
+        self.color = color
+        self.backgroundColor = backgroundColor
+        self.fontFamily = fontFamily
+        self.fontSize = fontSize
+        self.fontWeight = fontWeight
+        self.fontStyle = fontStyle
+        self.letterSpacing = letterSpacing
+        self.wordSpacing = wordSpacing
+        self.height = height
+        self.decoration = decoration
+        self.decorationColor = decorationColor
+        self.decorationStyle = decorationStyle
+        self.decorationThickness = decorationThickness
+        self.overflow = overflow
+    }
+
+    public func resolveFont(useFlutterScale: Bool?, flutterScaleFactor: CGFloat?) -> UIFont {
+        let size = fontSize ?? UIFont.systemFontSize
+        let font = FlutterFontRegistry.resolveOrSystemDefault(
+            family: fontFamily,
+            size: size,
+            weight: fontWeight)
+        if
+            useFlutterScale == true,
+            let flutterScaleFactor = flutterScaleFactor {
+            return UIFont(descriptor: font.fontDescriptor, size: flutterScaleFactor * size)
+        }
+        return UIFontMetrics.default.scaledFont(for: font)
+    }
+
+    public var uiWeight: CGFloat {
+        FlutterFontRegistry.appleWeightFromFlutterWeight(fontWeight ?? 400)
+    }
+
+}
+
+
+public struct AccessibleTextViewOptions: Codable {
+    let html: String?
+    let textStyle: TextStyle?
+    let linkStyle: TextStyle?
+    let useFlutterTextScale: Bool?
+    let flutterTextScaleFactor: CGFloat?
+    let backgroundColor: APIColor?
     let autoLinkify: Bool?
     let isSelectable: Bool?
     let minLines: Int?
     let maxLines: Int?
-    let appearance: TextViewAppearance?
+    let brightness: Brightness?
     let errorCode: String?
     let errorMessage: String?
 
+    public func copyWith(_ newOptions: AccessibleTextViewOptions) -> AccessibleTextViewOptions
+    {
+        AccessibleTextViewOptions(
+            html: newOptions.html ?? self.html,
+            textStyle: newOptions.textStyle ?? self.textStyle,
+            linkStyle: newOptions.linkStyle ?? self.linkStyle,
+            useFlutterTextScale: newOptions.useFlutterTextScale ?? self.useFlutterTextScale,
+            flutterTextScaleFactor: newOptions.flutterTextScaleFactor ?? self.flutterTextScaleFactor,
+            backgroundColor: newOptions.backgroundColor ?? self.backgroundColor,
+            autoLinkify: newOptions.autoLinkify ?? self.autoLinkify,
+            isSelectable: newOptions.isSelectable ?? self.isSelectable,
+            minLines: newOptions.minLines ?? self.minLines,
+            maxLines: newOptions.maxLines ?? self.maxLines,
+            brightness: newOptions.brightness ?? self.brightness,
+            errorCode: newOptions.errorCode ?? self.errorCode,
+            errorMessage: newOptions.errorMessage ?? self.errorMessage)
+    }
+
     public init(
         html: String? = nil,
-        textColor: [CGFloat]? = nil,
-        linkColor: [CGFloat]? = nil,
-        textWeight: Int? = nil,
-        linkWeight: Int? = nil,
-        backgroundColor: [CGFloat]? = nil,
-        fontFamily: String? = nil,
-        fontSize: CGFloat? = nil,
+        textStyle: TextStyle? = nil,
+        linkStyle: TextStyle? = nil,
+        useFlutterTextScale: Bool? = nil,
+        flutterTextScaleFactor: CGFloat? = nil,
+        backgroundColor: APIColor? = nil,
         autoLinkify: Bool? = nil,
         isSelectable: Bool? = nil,
         minLines: Int? = nil,
         maxLines: Int? = nil,
-        appearance: TextViewAppearance? = nil,
+        brightness: Brightness? = nil,
         errorCode: String? = nil,
-        errorMessage: String? = nil
-    ) {
+        errorMessage: String? = nil)
+    {
         self.html = html
-        self.textColor = textColor
-        self.linkColor = linkColor
-        self.textWeight = textWeight
-        self.linkWeight = linkWeight
+        self.textStyle = textStyle
+        self.linkStyle = linkStyle
+        self.useFlutterTextScale = useFlutterTextScale
+        self.flutterTextScaleFactor = flutterTextScaleFactor
         self.backgroundColor = backgroundColor
-        self.fontFamily = fontFamily
-        self.fontSize = fontSize
         self.autoLinkify = autoLinkify
         self.isSelectable = isSelectable
         self.minLines = minLines
         self.maxLines = maxLines
-        self.appearance = appearance
+        self.brightness = brightness
         self.errorCode = errorCode
         self.errorMessage = errorMessage
-    }
-
-    func uiTextWeight() -> CGFloat? {
-        uiFontWeight(textWeight)
-    }
-
-    func uiLinkWeight() -> CGFloat? {
-        uiFontWeight(linkWeight)
-    }
-
-    func uiFontWeight(_ weight: Int?) -> CGFloat? {
-        guard let weight = weight else { return nil }
-
-        return FlutterFontRegistry.appleWeightFromFlutterWeight(weight)
-    }
-
-    func uiTextColor() -> UIColor? {
-        uiColor(textColor)
-    }
-
-    func uiLinkColor() -> UIColor? {
-        uiColor(linkColor)
-    }
-
-    func uiBackgroundColor() -> UIColor? {
-        uiColor(backgroundColor)
-    }
-
-    func uiTextFont() -> UIFont? {
-        FlutterFontRegistry.resolve(family: fontFamily, size: fontSize, weight: textWeight)
-    }
-
-    func uiLinkFont() -> UIFont? {
-        FlutterFontRegistry.resolve(family: fontFamily, size: fontSize, weight: linkWeight)
-    }
-
-    private func uiColor(_ array: [CGFloat]?) -> UIColor? {
-        guard
-            let array = array,
-            array.count == 4
-        else { return nil }
-
-        let red = array[1] / 255.0
-        let green = array[2] / 255.0
-        let blue = array[3] / 255.0
-        let alpha = array[0] / 255.0
-
-        return UIColor(red: red, green: green, blue: blue, alpha: alpha)
     }
 
     func htmlToAttributedString() -> NSAttributedString? {
         guard
             let html = html,
+            !html.isEmpty,
             let data = html.data(using: .utf8)
         else { return nil }
 
@@ -422,9 +467,6 @@ public class MyTextView: UITextView, UITextViewDelegate, UIContextMenuInteractio
 }
 
 public class TextView: NSObject, FlutterPlatformView {
-    public var textFont: UIFont?
-    public var linkFont: UIFont?
-
     public func view() -> UIView {
         textView
     }
@@ -436,10 +478,12 @@ public class TextView: NSObject, FlutterPlatformView {
         arguments _: Any?
     ) {
         super.init()
-        channel = FlutterMethodChannel(name: "com.dra11y.flutter/accessible_text_view_\(id)", binaryMessenger: messenger)
+        channel = FlutterMethodChannel(name: "com.dra11y.flutter/accessible_text_view/\(id)", binaryMessenger: messenger)
         channel.setMethodCallHandler(onMethodCall)
         textView = MyTextView(frame: frame)
+
         textView.isEditable = false
+        textView.adjustsFontForContentSizeCategory = true
         textView.isUserInteractionEnabled = true
         /// The following doesn't seem to work reliably, so we manually implement below.
         // textView.dataDetectorTypes = .all
@@ -450,8 +494,9 @@ public class TextView: NSObject, FlutterPlatformView {
     private var textView: MyTextView!
     private var viewId: Int64 = 0
     private var channel: FlutterMethodChannel!
+    private var options = AccessibleTextViewOptions()
 
-    private func onMethodCall(call: FlutterMethodCall, result: FlutterResult) {
+    private func onMethodCall(call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
         case "setOptions":
             setOptions(call: call, result: result)
@@ -460,38 +505,59 @@ public class TextView: NSObject, FlutterPlatformView {
         }
     }
 
-    private func setOptions(call: FlutterMethodCall, result: FlutterResult) {
-        guard let json = call.arguments as? String else {
-            assertionFailure("No options provided.")
+    private func flutterError(_ result: FlutterResult?, _ message: String?) {
+        guard let result = result else { return }
+        result(FlutterError(code: "AccessibleTextViewOptions", message: message, details: nil))
+    }
+
+    private func update(_ result: FlutterResult? = nil) {
+        guard
+            let htmlAttributedString = options.htmlToAttributedString() ?? textView.attributedText
+        else {
+            flutterError(result, "html cannot be blank.")
             return
         }
 
-        let options = AccessibleTextViewOptions.from(json: json)
+        var additionalTextAttributes = [NSAttributedString.Key: Any]()
 
-        if let attributedString = options.htmlToAttributedString() {
-            textView.attributedText = attributedString
+        let fontSize = options.textStyle?.fontSize ?? UIFont.systemFontSize
+
+        let fallbackFont = UIFontMetrics.default.scaledFont(for: UIFont.systemFont(ofSize: fontSize))
+
+        let textFont = options.textStyle?.resolveFont(
+            useFlutterScale: options.useFlutterTextScale,
+            flutterScaleFactor: options.flutterTextScaleFactor)
+            ?? fallbackFont
+        additionalTextAttributes[.font] = textFont
+
+        let linkFont = options.linkStyle?.resolveFont(
+            useFlutterScale: options.useFlutterTextScale,
+            flutterScaleFactor: options.flutterTextScaleFactor)
+            ?? textFont
+
+        if let height = options.textStyle?.height {
+            var range = NSRange(location: 0, length: htmlAttributedString.length)
+            if
+                let paragraphStyle = (
+                    (htmlAttributedString.attribute(.paragraphStyle, at: 0, effectiveRange: &range) as? NSParagraphStyle)
+                    ?? NSParagraphStyle()
+                ).mutableCopy() as? NSMutableParagraphStyle
+            {
+                paragraphStyle.lineSpacing = fontSize * (height - 1.0)
+                additionalTextAttributes[.paragraphStyle] = paragraphStyle
+            }
         }
 
-        textView.adjustsFontForContentSizeCategory = true
+        let mutableString = NSMutableAttributedString(attributedString: htmlAttributedString)
+        mutableString.addAttributes(additionalTextAttributes, range: NSRange(location: 0, length: mutableString.length))
+        textView.attributedText = NSAttributedString(attributedString: mutableString)
 
-        if let textFont = options.uiTextFont() {
-            self.textFont = textFont
-        }
-        if let linkFont = options.uiLinkFont() {
-            self.linkFont = linkFont
-        }
-
-        let textFont: UIFont = self.textFont ?? UIFont.systemFont(ofSize: UIFont.systemFontSize)
-        let linkFont: UIFont = self.linkFont ?? UIFont.systemFont(ofSize: UIFont.systemFontSize)
-
-        textView.font = UIFontMetrics.default.scaledFont(for: textFont)
-
-        if let textColor = options.uiTextColor() {
+        if let textColor = options.textStyle?.color?.uiColor {
             textView.textColor = textColor
         }
 
         var linkAttributes = [NSAttributedString.Key: Any]()
-        if let linkColor = options.uiLinkColor() {
+        if let linkColor = options.linkStyle?.color?.uiColor {
             linkAttributes[.foregroundColor] = linkColor
         }
 
@@ -501,21 +567,18 @@ public class TextView: NSObject, FlutterPlatformView {
             let weight = traits[.weight] as? CGFloat
         {
             textWeight = weight
-            print("Got textWeight of \(weight)")
         } else {
-            print("Taking default textWeight of 0.0")
             textWeight = 1.0 // normal
         }
 
-        let linkWeight = options.uiLinkWeight() ?? textWeight
+        let linkWeight = options.linkStyle?.uiWeight ?? textWeight
 
         let descriptor = linkFont.fontDescriptor.addingAttributes([
             UIFontDescriptor.AttributeName.traits: [
                 UIFontDescriptor.TraitKey.weight: linkWeight,
             ],
         ])
-        let updatedLinkFont = UIFontMetrics.default.scaledFont(
-            for: UIFont(descriptor: descriptor, size: textFont.pointSize))
+        let updatedLinkFont = UIFont(descriptor: descriptor, size: textFont.pointSize)
         linkAttributes[.font] = updatedLinkFont
         linkAttributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
         textView.linkTextAttributes = linkAttributes
@@ -553,13 +616,13 @@ public class TextView: NSObject, FlutterPlatformView {
 
         if
             #available(iOS 13.0, *),
-            let appearance = options.appearance
+            let appearance = options.brightness
         {
             textView.overrideUserInterfaceStyle = appearance.userInterfaceStyle
             textView.window?.overrideUserInterfaceStyle = appearance.userInterfaceStyle
         }
 
-        if let backgroundColor = options.uiBackgroundColor() {
+        if let backgroundColor = options.backgroundColor?.uiColor {
             textView.backgroundColor = backgroundColor
         }
 
@@ -574,6 +637,17 @@ public class TextView: NSObject, FlutterPlatformView {
             textView.textContainer.lineBreakMode = .byTruncatingTail
         }
 
-        result(nil)
+        result?(nil)
+    }
+
+    private func setOptions(call: FlutterMethodCall, result: @escaping FlutterResult) {
+        guard let json = call.arguments as? String else {
+            assertionFailure("No options provided.")
+            return
+        }
+
+        options = options.copyWith(AccessibleTextViewOptions.from(json: json))
+
+        update(result)
     }
 }

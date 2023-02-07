@@ -5,6 +5,8 @@ PODS:
   - Flutter (1.0.0)
   - native_flutter_fonts (0.0.1):
     - Flutter
+  - native_segments (0.0.1):
+    - Flutter
   - url_launcher_ios (0.0.1):
     - Flutter
 
@@ -12,6 +14,7 @@ DEPENDENCIES:
   - accessible_text_view (from `.symlinks/plugins/accessible_text_view/ios`)
   - Flutter (from `Flutter`)
   - native_flutter_fonts (from `.symlinks/plugins/native_flutter_fonts/ios`)
+  - native_segments (from `.symlinks/plugins/native_segments/ios`)
   - url_launcher_ios (from `.symlinks/plugins/url_launcher_ios/ios`)
 
 EXTERNAL SOURCES:
@@ -21,6 +24,8 @@ EXTERNAL SOURCES:
     :path: Flutter
   native_flutter_fonts:
     :path: ".symlinks/plugins/native_flutter_fonts/ios"
+  native_segments:
+    :path: ".symlinks/plugins/native_segments/ios"
   url_launcher_ios:
     :path: ".symlinks/plugins/url_launcher_ios/ios"
 
@@ -28,6 +33,7 @@ SPEC CHECKSUMS:
   accessible_text_view: b35db33843d4ef8bb7ccb5eab84fd7b4a224308c
   Flutter: f04841e97a9d0b0a8025694d0796dd46242b2854
   native_flutter_fonts: f229c8289a7233fb488fec4314380232c301bcbf
+  native_segments: b1b7143e7d83293133f7e132557835f286544b1a
   url_launcher_ios: ae1517e5e344f5544fb090b079e11f399dfbe4d2
 
 PODFILE CHECKSUM: ef19549a9bc3046e7bb7d2fab4d021637c0c58a3

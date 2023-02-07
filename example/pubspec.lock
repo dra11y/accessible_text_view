@@ -7,7 +7,7 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "1.0.1"
+    version: "1.1.0"
   async:
     dependency: transitive
     description:
@@ -48,6 +48,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.17.0"
+  crypto:
+    dependency: transitive
+    description:
+      name: crypto
+      sha256: aa274aa7774f8964e4f4f38cc994db7b6158dd36e9187aaceaddc994b35c6c67
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.0.2"
   cupertino_icons:
     dependency: "direct main"
     description:
@@ -131,10 +139,18 @@ packages:
     dependency: transitive
     description:
       name: native_flutter_fonts
-      sha256: "1d1b4866f8eb90bdfd86a1e95538a12cb0816b53a9b9bca7659017bef33f23ab"
+      sha256: "7f5e03058fe1925764fb0ecced452e495a8861bca6f5ea45e511051230206a1d"
       url: "https://pub.dev"
     source: hosted
-    version: "1.0.1"
+    version: "1.0.5"
+  native_segments:
+    dependency: "direct main"
+    description:
+      name: native_segments
+      sha256: "6174892c90c74ad4bdb07a011510a696276a45a304660cece8eaa67c5a3af312"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.0"
   path:
     dependency: transitive
     description:
@@ -204,6 +220,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.4.16"
+  typed_data:
+    dependency: transitive
+    description:
+      name: typed_data
+      sha256: "26f87ade979c47a150c9eaab93ccd2bebe70a27dc0b4b29517f2904f04eb11a5"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.3.1"
   url_launcher:
     dependency: "direct main"
     description:
@@ -268,6 +292,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.3"
+  uuid:
+    dependency: transitive
+    description:
+      name: uuid
+      sha256: "648e103079f7c64a36dc7d39369cabb358d377078a051d6ae2ad3aa539519313"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.0.7"
   vector_math:
     dependency: transitive
     description:
@@ -278,4 +310,4 @@ packages:
     version: "2.1.4"
 sdks:
   dart: ">=2.19.0 <3.0.0"
-  flutter: ">=3.0.0"
+  flutter: ">=3.3.2"

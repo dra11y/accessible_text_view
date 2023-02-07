@@ -16,7 +16,7 @@ class AccessibleTextViewFactory(private val messenger: BinaryMessenger) :
 
     override fun create(context: Context, id: Int, o: Any?): PlatformView {
         Log.e(TAG, "creating FlutterAccessibleTextView in factory!")
-        return FlutterAccessibleTextView(context, messenger, id)
+        return AccessibleTextView(context, messenger, id)
     }
 
 }

@@ -18,13 +18,21 @@ class AccessibleTextView extends StatefulWidget {
     /// Only accepts very simple HTML, such as links, boldface, and paragraph
     /// marks. More complex things such as image tags will not work.
     required this.html,
-    this.textColor,
-    this.textWeight,
-    this.linkColor,
-    this.linkWeight,
-    this.backgroundColor,
-    this.fontFamily,
-    this.fontSize,
+    this.textStyle,
+    this.linkStyle,
+
+    /// iOS does not follow the user's dynamic type scale setting exactly.
+    /// For example, when the user's text size is 190%, the actual scaled font size
+    /// is about 179% of normal size, and scaled values for UI are about 167%.
+    /// At 190% on iOS, Flutter's textScale is 1.94. Setting this value to `true`
+    /// (the default) will render the text on iOS at about the same size as it would be
+    /// in a Flutter `Text` widget (slightly larger), while setting it to `false` will
+    /// use Apple's native font scaling (slightly smaller).
+    this.useFlutterTextScale = true,
+
+    /// Defaults to `MediaQuery.of(context).textScaleFactor`
+    this.flutterTextScaleFactor,
+    this.backgroundColor = Colors.transparent,
 
     /// Uses data detection (Android and iOS) to auto-detect links that aren't explicitly
     /// added in the HTML, such as phone numbers and e-mail addresses.
@@ -39,7 +47,8 @@ class AccessibleTextView extends StatefulWidget {
     /// Override dark or light mode. On iOS, this is currently the only way to prevent
     /// the long-press menu from a very annoying color invert if your app's theme does not
     /// follow the system theme.
-    this.appearance = AccessibleTextViewAppearance.system,
+    /// Leave as `null` to use the system theme.
+    this.brightness,
 
     /// Callback fired when the native platform view is created.
     this.onTextViewCreated,
@@ -51,19 +60,17 @@ class AccessibleTextView extends StatefulWidget {
 
   final String html;
   // When `null`, these values take on the DefaultTextStyle of the build context.
-  final Color? textColor;
-  final FontWeight? textWeight;
-  final Color? linkColor;
-  final FontWeight? linkWeight;
-  final Color? backgroundColor;
-  final String? fontFamily;
-  final double? fontSize;
+  final TextStyle? textStyle;
+  final TextStyle? linkStyle;
+  final bool useFlutterTextScale;
+  final double? flutterTextScaleFactor;
+  final Color backgroundColor;
   // When `true`, auto-linkifies URLs, e-mails, and phone numbers.
   // When `false`, does NOT remove hardcoded links in the HTML.
   final bool autoLinkify;
   final bool isSelectable;
   final int maxLines;
-  final AccessibleTextViewAppearance appearance;
+  final Brightness? brightness;
   final AccessibleTextViewCreatedCallback? onTextViewCreated;
   final bool passTapAndLongPressGesturesToNativeView;
 
@@ -115,19 +122,30 @@ class _AccessibleTextViewState extends State<AccessibleTextView> {
   @override
   Widget build(BuildContext context) {
     final defaultTextStyle = DefaultTextStyle.of(context).style;
+
+    /// If we provide a `linkStyle`, allow us to override the color/decoration/weight.
+    /// Otherwise, fallback to `textStyle` or `defaultTextStyle`, but provide
+    /// a different color, bold, and underline for accessibility of links.
+    /// This way, we don't have to remember to provide these in `linkStyle`.
+    final linkStyle =
+        (widget.linkStyle ?? widget.textStyle ?? defaultTextStyle).copyWith(
+      color: widget.linkStyle?.color ?? Theme.of(context).colorScheme.primary,
+      decoration: widget.linkStyle?.decoration ?? TextDecoration.underline,
+      fontWeight: widget.linkStyle?.fontWeight ?? FontWeight.bold,
+    );
+
     final options = AccessibleTextViewOptions(
       html: widget.html,
-      textColor: widget.textColor ?? defaultTextStyle.color,
-      textWeight: widget.textWeight ?? FontWeight.normal,
-      linkColor: widget.linkColor ?? Theme.of(context).colorScheme.primary,
-      linkWeight: widget.linkWeight ?? FontWeight.bold,
-      backgroundColor: widget.backgroundColor ?? Colors.transparent,
-      fontFamily: widget.fontFamily ?? defaultTextStyle.fontFamily,
-      fontSize: widget.fontSize ?? defaultTextStyle.fontSize,
+      textStyle: widget.textStyle ?? defaultTextStyle,
+      linkStyle: linkStyle,
+      useFlutterTextScale: widget.useFlutterTextScale,
+      flutterTextScaleFactor: widget.flutterTextScaleFactor ??
+          MediaQuery.of(context).textScaleFactor,
+      backgroundColor: widget.backgroundColor,
       autoLinkify: widget.autoLinkify,
       isSelectable: widget.isSelectable,
       maxLines: widget.maxLines,
-      appearance: widget.appearance,
+      brightness: widget.brightness,
     );
 
     return Semantics(
@@ -158,61 +176,81 @@ class _AccessibleTextViewState extends State<AccessibleTextView> {
   }
 }
 
-/// Used to override the appearance of the native platform text view on iOS.
-enum AccessibleTextViewAppearance {
-  light,
-  dark,
-  system,
+extension JsonEncodableTextDecoration on TextDecoration {
+  String? toJsonString() {
+    if (contains(TextDecoration.underline)) return 'underline';
+    if (contains(TextDecoration.lineThrough)) return 'lineThrough';
+    if (contains(TextDecoration.overline)) return 'overline';
+    if (contains(TextDecoration.none)) return 'none';
+    return null;
+  }
+}
+
+extension JsonEncodableTextStyle on TextStyle {
+  String toJson() => jsonEncode(toMap());
+
+  Map<String, dynamic> toMap() {
+    return {
+      'color': color?.argb,
+      'backgroundColor': backgroundColor?.argb,
+      'fontFamily': fontFamily,
+      'fontSize': fontSize,
+      'fontWeight': fontWeight?.value,
+      'fontStyle': fontStyle?.name,
+      'letterSpacing': letterSpacing,
+      'wordSpacing': wordSpacing,
+      'height': height,
+      'decoration': decoration?.toJsonString(),
+      'decorationColor': decorationColor?.argb,
+      'decorationStyle': decorationStyle?.name,
+      'decorationThickness': decorationThickness,
+      'overflow': overflow?.name,
+    };
+  }
 }
 
 /// Set the options of the native platform text view widget.
 class AccessibleTextViewOptions {
   AccessibleTextViewOptions({
     this.html,
-    this.textColor,
-    this.textWeight,
-    this.linkColor,
-    this.linkWeight,
+    this.textStyle,
+    this.linkStyle,
+    this.useFlutterTextScale,
+    this.flutterTextScaleFactor,
     this.backgroundColor,
-    this.fontFamily,
-    this.fontSize,
     this.autoLinkify,
     this.isSelectable,
     this.maxLines,
-    this.appearance,
+    this.brightness,
   });
 
   final String? html;
-  final Color? textColor;
-  final FontWeight? textWeight;
-  final Color? linkColor;
-  final FontWeight? linkWeight;
+  final TextStyle? textStyle;
+  final TextStyle? linkStyle;
+  final bool? useFlutterTextScale;
+  final double? flutterTextScaleFactor;
   final Color? backgroundColor;
-  final String? fontFamily;
-  final double? fontSize;
   // When `true`, auto-linkifies URLs, e-mails, and phone numbers.
   // When `false`, does NOT remove hardcoded links in the HTML.
   final bool? autoLinkify;
   final bool? isSelectable;
   final int? maxLines;
-  final AccessibleTextViewAppearance? appearance;
+  final Brightness? brightness;
 
   String toJson() => jsonEncode(toMap());
 
   Map<String, dynamic> toMap() {
     return {
       'html': html,
-      'textColor': textColor?.argb,
-      'textWeight': textWeight?.value,
-      'linkColor': linkColor?.argb,
-      'linkWeight': linkWeight?.value,
+      'textStyle': textStyle?.toMap(),
+      'linkStyle': linkStyle?.toMap(),
+      'useFlutterTextScale': useFlutterTextScale,
+      'flutterTextScaleFactor': flutterTextScaleFactor,
       'backgroundColor': backgroundColor?.argb,
-      'fontFamily': fontFamily,
-      'fontSize': fontSize,
       'autoLinkify': autoLinkify,
       'isSelectable': isSelectable,
       'maxLines': maxLines,
-      'appearance': appearance?.name,
+      'brightness': brightness?.name,
     };
   }
 }
@@ -226,7 +264,7 @@ extension ColorExtension on Color {
 class AccessibleTextViewController {
   AccessibleTextViewController._(int id)
       : _channel =
-            MethodChannel('com.dra11y.flutter/accessible_text_view_$id') {
+            MethodChannel('com.dra11y.flutter/accessible_text_view/$id') {
     _channel.setMethodCallHandler(onMethodCall);
   }
 

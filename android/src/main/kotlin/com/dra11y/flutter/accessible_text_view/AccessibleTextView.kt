@@ -3,15 +3,17 @@ package com.dra11y.flutter.accessible_text_view
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Typeface
+import android.os.Build
 import android.text.Spannable
 import android.text.method.LinkMovementMethod
 import android.util.Log
+import android.util.TypedValue
 import android.view.View
 import android.view.View.IMPORTANT_FOR_ACCESSIBILITY_YES
+import android.view.accessibility.AccessibilityNodeInfo
 import android.widget.TextView
 import androidx.core.text.HtmlCompat
 import androidx.core.text.HtmlCompat.FROM_HTML_MODE_LEGACY
-import com.dra11y.flutter.native_flutter_fonts.FlutterFontRegistry
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -19,22 +21,25 @@ import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.platform.PlatformView
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+import kotlin.math.roundToInt
+import kotlin.reflect.typeOf
 
-class FlutterAccessibleTextView(
-    context: Context,
-    messenger: BinaryMessenger,
-    id: Int,
+class AccessibleTextView(
+    private val context: Context,
+    private val messenger: BinaryMessenger,
+    private val id: Int,
 ) : PlatformView, MethodCallHandler {
     private val textView: TextView
     private val methodChannel: MethodChannel
     private var html: String = ""
     private var autoLinkify: Boolean = true
     private var textTypeface: Typeface? = null
-    private var linkTypeface: Typeface? = null
+    private var textStyle: AccessibleTextViewOptions.TextStyle? = null
+    private var linkStyle: AccessibleTextViewOptions.TextStyle? = null
     private var options: AccessibleTextViewOptions? = null
 
     companion object {
-        private const val TAG = "Fl..rAccessibleTextView"
+        private const val TAG = "AccessibleTextView"
     }
 
     init {
@@ -45,17 +50,32 @@ class FlutterAccessibleTextView(
                 refreshOptions()
             }
         }
-        methodChannel = MethodChannel(messenger, "com.dra11y.flutter/accessible_text_view_$id")
+        methodChannel = MethodChannel(messenger, "com.dra11y.flutter/accessible_text_view/$id")
         methodChannel.setMethodCallHandler(this)
         textView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-            // Add one extra line "leading" as padding to the height of the text view.
-            val unscaledHeight = textView.textSize * textView.lineCount + textView.paint.fontMetrics.leading
-            // Divide by the density, rather than the scaledDensity, as Flutter doesn't care about the scale.
-            // Otherwise, scaledDensity gets applied twice, and the calculated height is too tall.
-            val wantedHeight = unscaledHeight / textView.paint.density
-            wantsHeight(wantedHeight)
+            computeLinePixelHeight()?.let { pixelHeight ->
+                wantsHeight(pixelHeight * textView.lineCount)
+            }
         }
     }
+
+    fun getFontSize(): Float = textStyle?.fontSize ?: run {
+        val textAppearance = TypedValue()
+        context.theme.resolveAttribute(android.R.attr.textAppearance, textAppearance, true)
+        val textAppearanceStyle = context.obtainStyledAttributes(textAppearance.data, intArrayOf(android.R.attr.textSize))
+        val textSize = textAppearanceStyle.getDimension(0, 0f)
+        textAppearanceStyle.recycle()
+        textSize / context.resources.displayMetrics.scaledDensity
+    }
+
+    fun computeLinePixelHeight(): Float? = with(context.resources.displayMetrics) {
+        textStyle?.height?.let { height ->
+            height * getFontSize() * scaledDensity / density
+        }
+    }
+//            (it.height ?: 1.0f) *
+//            (it.fontSize ?: (textSize / paint.density)) * paint.density
+//        }
 
     // This function is called several times every time TalkBack focus changes.
     override fun getView(): View {
@@ -78,7 +98,7 @@ class FlutterAccessibleTextView(
 
     private fun refreshOptions(): Boolean {
         val options = options ?: return false
-        Log.d(TAG, "refreshOptions $options")
+        Log.e(TAG, "refreshOptions $options")
         var needsUpdate = false
         options.html?.let {
             html = it
@@ -88,31 +108,44 @@ class FlutterAccessibleTextView(
             autoLinkify = it
             needsUpdate = true
         }
-        options.textColor?.let { textView.setTextColor(it.toColor()) }
-        options.linkColor?.let { textView.setLinkTextColor(it.toColor()) }
-        val textWeight = options.textWeight ?: 400
-        val textIsItalic = options.textIsItalic ?: false
-        val linkWeight = options.linkWeight ?: 700
-        val linkIsItalic = options.linkIsItalic ?: false
-        options.fontFamily?.let {
-            textTypeface = FlutterFontRegistry.resolve(it, weight = textWeight, isItalic = textIsItalic)
+
+        options.textStyle?.let { textStyle ->
+            textStyle.color?.let { textView.setTextColor(it.toColor()) }
+            this.textStyle = textStyle
+            textTypeface = textStyle.resolveTypeface()
+            val fontSize = getFontSize()
+            println("textStyle.fontSize = $fontSize")
+            println("textStyle.height = ${textStyle.height}")
+            textView.textSize = fontSize
+            textStyle.height?.let { height ->
+                /// lineSpacing on Android is only the extra spacing, not including the font height itself.
+                val lineSpacing = (height - 1.0f) * fontSize * context.resources.displayMetrics.scaledDensity
+                println("lineSpacing = $lineSpacing")
+                textView.setLineSpacing(lineSpacing, 1f)
+            }
             needsUpdate = true
         }
-        options.fontFamily?.let {
-            linkTypeface = FlutterFontRegistry.resolve(it, weight = linkWeight, isItalic = linkIsItalic)
+
+        options.linkStyle?.let { linkStyle ->
+            linkStyle.color?.let { textView.setLinkTextColor(it.toColor()) }
+            this.linkStyle = linkStyle
             needsUpdate = true
         }
+
         textView.typeface = textTypeface ?: Typeface.DEFAULT
-        options.fontSize?.let { textView.textSize = it }
         options.isSelectable?.let { textView.setTextIsSelectable(it) }
+
+        // Android doesn't support 0 maxLines, therefore, when 0, set it to "infinity."
         options.maxLines?.let { textView.maxLines = if (it < 1) Int.MAX_VALUE else it }
+
         if (needsUpdate) update()
         return true
     }
 
     private fun setOptions(methodCall: MethodCall, result: MethodChannel.Result) {
         Log.d(TAG, "setOptions")
-        options = Json.decodeFromString<AccessibleTextViewOptions>(methodCall.arguments as String)
+        val json = Json { ignoreUnknownKeys = true }
+        options = json.decodeFromString<AccessibleTextViewOptions>(methodCall.arguments as String)
         if (refreshOptions()) result.success(null)
         else result.error("setOptions", "Could not set options.", null)
     }
@@ -122,14 +155,12 @@ class FlutterAccessibleTextView(
 
         val htmlSpannable = HtmlCompat.fromHtml(html, FROM_HTML_MODE_LEGACY) as Spannable
 
-        val linkTypeface = linkTypeface ?: Typeface.DEFAULT_BOLD
-
         if (autoLinkify) {
             htmlSpannable.autoLinkify()
         }
 
         // Format spans with bold and sort them in order for TalkBack.
-        htmlSpannable.formatSpans(linkTypeface)
+        htmlSpannable.formatSpans(linkStyle)
 
         textView.linksClickable = true
         textView.movementMethod = LinkMovementMethod.getInstance()
