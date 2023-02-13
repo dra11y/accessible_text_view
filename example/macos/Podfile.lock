@@ -1,0 +1,35 @@
+PODS:
+  - accessible_text_view (0.0.1):
+    - FlutterMacOS
+    - native_flutter_fonts
+  - FlutterMacOS (1.0.0)
+  - native_flutter_fonts (0.0.1):
+    - FlutterMacOS
+  - url_launcher_macos (0.0.1):
+    - FlutterMacOS
+
+DEPENDENCIES:
+  - accessible_text_view (from `Flutter/ephemeral/.symlinks/plugins/accessible_text_view/macos`)
+  - FlutterMacOS (from `Flutter/ephemeral`)
+  - native_flutter_fonts (from `Flutter/ephemeral/.symlinks/plugins/native_flutter_fonts/macos`)
+  - url_launcher_macos (from `Flutter/ephemeral/.symlinks/plugins/url_launcher_macos/macos`)
+
+EXTERNAL SOURCES:
+  accessible_text_view:
+    :path: Flutter/ephemeral/.symlinks/plugins/accessible_text_view/macos
+  FlutterMacOS:
+    :path: Flutter/ephemeral
+  native_flutter_fonts:
+    :path: Flutter/ephemeral/.symlinks/plugins/native_flutter_fonts/macos
+  url_launcher_macos:
+    :path: Flutter/ephemeral/.symlinks/plugins/url_launcher_macos/macos
+
+SPEC CHECKSUMS:
+  accessible_text_view: 45dc67d71312ce80c627e6bf2fce380f9163fa06
+  FlutterMacOS: 8f6f14fa908a6fb3fba0cd85dbd81ec4b251fb24
+  native_flutter_fonts: 78047c6e905d9d7ff7f3e1acb5b64175e4de85fc
+  url_launcher_macos: c04e4fa86382d4f94f6b38f14625708be3ae52e2
+
+PODFILE CHECKSUM: 353c8bcc5d5b0994e508d035b5431cfe18c1dea7
+
+COCOAPODS: 1.11.3

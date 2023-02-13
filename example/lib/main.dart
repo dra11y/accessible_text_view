@@ -1,4 +1,5 @@
 import 'package:accessible_text_view/accessible_text_view.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:native_segments/native_segments.dart';
@@ -126,20 +127,42 @@ class _TextViewExampleState extends State<TextViewExample> {
           children: [
             Padding(
               padding: const EdgeInsets.all(8.0),
-              child: NativeSegments(
-                segments: [
-                  NativeSegment(title: 'AccessibleTextView'),
-                  NativeSegment(title: 'Flutter Text.rich'),
-                ],
-                style: const NativeSegmentsStyle(
-                  isDarkTheme: true,
-                ),
-                onValueChanged: (value) {
-                  setState(() {
-                    isFlutterTextView = value == 1;
-                  });
-                },
-              ),
+              child: [TargetPlatform.iOS, TargetPlatform.android]
+                      .contains(defaultTargetPlatform)
+                  ? NativeSegments(
+                      segments: [
+                        NativeSegment(title: 'AccessibleTextView'),
+                        NativeSegment(title: 'Flutter Text.rich'),
+                      ],
+                      style: const NativeSegmentsStyle(
+                        isDarkTheme: true,
+                      ),
+                      onValueChanged: (value) {
+                        setState(() {
+                          isFlutterTextView = value == 1;
+                        });
+                      },
+                    )
+                  : SegmentedButton(
+                      emptySelectionAllowed: false,
+                      multiSelectionEnabled: false,
+                      segments: const [
+                        ButtonSegment(
+                          value: 0,
+                          label: Text('AccessibleTextView'),
+                        ),
+                        ButtonSegment(
+                          value: 1,
+                          label: Text('Flutter Text.rich'),
+                        ),
+                      ],
+                      selected: {isFlutterTextView ? 1 : 0},
+                      onSelectionChanged: (selectedSet) {
+                        setState(() {
+                          isFlutterTextView = selectedSet.contains(1);
+                        });
+                      },
+                    ),
             ),
             Expanded(
               flex: 3,

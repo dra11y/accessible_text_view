@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:visibility_detector/visibility_detector.dart';
 
 /// A callback fired when the native platform text view is created.
 typedef AccessibleTextViewCreatedCallback = void Function(
@@ -40,7 +41,7 @@ class AccessibleTextView extends StatefulWidget {
     this.autoLinkify = true,
 
     /// If `true`, makes the text selectable, which can make the VoiceOver user experience
-    /// a bit more complicated.
+    /// a bit more complicated on iOS.
     this.isSelectable = false,
     this.maxLines = 0,
 
@@ -82,7 +83,8 @@ class AccessibleTextView extends StatefulWidget {
 class _AccessibleTextViewState extends State<AccessibleTextView> {
   AccessibleTextViewController? controller;
 
-  GlobalKey key = GlobalKey();
+  final GlobalKey visibilityKey = GlobalKey();
+  final GlobalKey key = GlobalKey();
 
   // Must be at least 1 or view won't be created on Android.
   double wantedHeight = 1;
@@ -100,24 +102,34 @@ class _AccessibleTextViewState extends State<AccessibleTextView> {
           }
         : null;
 
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      return AndroidView(
-        key: key,
-        viewType: 'com.dra11y.flutter/accessible_text_view',
-        onPlatformViewCreated: (id) => _onPlatformViewCreated(id, options),
-        gestureRecognizers: gestureRecognizers,
-      );
-    } else if (defaultTargetPlatform == TargetPlatform.iOS) {
-      return UiKitView(
-        key: key,
-        viewType: 'com.dra11y.flutter/accessible_text_view',
-        gestureRecognizers: gestureRecognizers,
-        onPlatformViewCreated: (id) => _onPlatformViewCreated(id, options),
-      );
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        return AndroidView(
+          key: key,
+          viewType: 'com.dra11y.flutter/accessible_text_view',
+          onPlatformViewCreated: (id) => _onPlatformViewCreated(id, options),
+          gestureRecognizers: gestureRecognizers,
+        );
+
+      case TargetPlatform.iOS:
+      case TargetPlatform.macOS:
+        return UiKitView(
+          key: key,
+          viewType: 'com.dra11y.flutter/accessible_text_view',
+          gestureRecognizers: gestureRecognizers,
+          onPlatformViewCreated: (id) => _onPlatformViewCreated(id, options),
+        );
+
+      case TargetPlatform.fuchsia:
+      case TargetPlatform.linux:
+      case TargetPlatform.windows:
+        throw UnimplementedError(
+            'accessible_text_view: buildPlatformWidget is not yet implemented on ${defaultTargetPlatform.name}.');
     }
-    return Text(
-        '$defaultTargetPlatform is not yet supported by the accessible_text_view plugin');
   }
+
+  Widget? platformWidget;
+  Widget visibleWidget = const SizedBox.shrink();
 
   @override
   Widget build(BuildContext context) {
@@ -148,12 +160,28 @@ class _AccessibleTextViewState extends State<AccessibleTextView> {
       brightness: widget.brightness,
     );
 
-    return Semantics(
-      container: true,
-      explicitChildNodes: true,
-      child: SizedBox(
-        height: wantedHeight,
-        child: buildPlatformWidget(context, options),
+    visibleWidget = buildPlatformWidget(context, options);
+    platformWidget ??= visibleWidget;
+
+    return VisibilityDetector(
+      key: visibilityKey,
+      onVisibilityChanged: (VisibilityInfo info) {
+        setState(() {
+          print('info.visibleFraction = ${info.visibleFraction}');
+          if (info.visibleFraction < 0.2) {
+            visibleWidget = const SizedBox.shrink();
+          } else {
+            visibleWidget = platformWidget ?? const SizedBox.shrink();
+          }
+        });
+      },
+      child: Semantics(
+        container: true,
+        explicitChildNodes: true,
+        child: SizedBox(
+          height: wantedHeight,
+          child: visibleWidget,
+        ),
       ),
     );
   }
@@ -161,6 +189,7 @@ class _AccessibleTextViewState extends State<AccessibleTextView> {
   void _wantsHeight(double? height) {
     if (height == null) return;
     if (height != wantedHeight) {
+      print('updating wantedHeight to $height');
       setState(() {
         wantedHeight = height;
       });

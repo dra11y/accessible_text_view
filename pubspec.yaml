@@ -11,7 +11,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  native_flutter_fonts: ^1.0.5
+  # native_flutter_fonts: ^1.0.5
+  native_flutter_fonts:
+    path: /Users/tom/native_flutter_fonts
+  visibility_detector: ^0.3.3
 
 dev_dependencies:
   flutter_test:
@@ -25,4 +28,6 @@ flutter:
         package: com.dra11y.flutter.accessible_text_view
         pluginClass: AccessibleTextViewPlugin
       ios:
+        pluginClass: AccessibleTextViewPlugin
+      macos:
         pluginClass: AccessibleTextViewPlugin
